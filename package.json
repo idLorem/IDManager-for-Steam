@@ -1,0 +1,46 @@
+{
+  "name": "vanity-swap",
+  "version": "1.0.0",
+  "description": "Swap, manage and hunt Steam custom profile IDs",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test.js",
+    "build": "electron-builder --win portable && node -e \"require('fs').rmSync('dist/win-unpacked',{recursive:true,force:true})\""
+  },
+  "build": {
+    "appId": "local.vanityswap",
+    "productName": "SteamIDManager",
+    "compression": "maximum",
+    "electronLanguages": ["en-US", "ru"],
+    "files": [
+      "main.js",
+      "preload.js",
+      "swap.js",
+      "prompt.js",
+      "hunt.js",
+      "accounts.js",
+      "index.html",
+      "build/icon.png"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "SteamIDManager.exe"
+    }
+  },
+  "dependencies": {
+    "cheerio": "0.22.0",
+    "steam-totp": "^2.1.2",
+    "steam-user": "^5.3.0",
+    "steamcommunity": "^3.50.3"
+  },
+  "devDependencies": {
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0"
+  }
+}

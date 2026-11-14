@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'unsafe-inline'">
+<title>SteamIDManager</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0f1318;--top:#0f1318;--card:#1b232d;--inner:#212b37;--raised:#2a3645;--field:#11161c;--line:rgba(199,213,224,.11);--line2:rgba(199,213,224,.24);
+  --fg:#d7e3ec;--fg2:#a3b2bf;--mut:#8896a4;--ink:#0b1117;
+  --acc:#66c0f4;--pos:#5ec98f;--neg:#ee6a6e;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  --mono:"Cascadia Mono",Consolas,ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/20px var(--sans)}
+.app{max-width:880px;margin:0 auto;padding:24px 32px 48px;display:flex;flex-direction:column;gap:16px}
+
+header{background:var(--top);border-bottom:1px solid var(--line);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+header .in{display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:880px;height:64px;margin:0 auto;padding:0 32px}
+h1{display:flex;align-items:center;gap:12px;margin:0;font-size:24px;line-height:32px;font-weight:500;letter-spacing:.2px}
+.logo{flex:none;width:36px;height:36px}
+.top{display:flex;align-items:center;gap:8px}
+.lang{display:flex;gap:2px;padding:2px;background:var(--field);border:1px solid var(--line);border-radius:8px}
+.lang button{width:40px;height:28px;border:0;border-radius:6px;background:none;color:var(--mut);font:500 12px var(--sans);cursor:pointer;transition:background-color .15s var(--ease),color .15s var(--ease)}
+.lang button:hover{color:var(--fg)}
+.lang button[aria-pressed=true]{background:var(--raised);color:var(--fg)}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+.card .card{background:var(--inner);border-radius:10px;padding:16px}
+.card h2{margin:0;font-size:16px;line-height:24px;font-weight:500}
+#swp{display:flex;flex-direction:column;gap:16px}
+.cap{margin:0 0 16px;font-size:12px;line-height:16px;color:var(--mut)}
+.field{margin-top:12px}
+label{display:block;margin-bottom:4px;font-size:12px;line-height:16px;color:var(--fg2)}
+.hint{margin-top:4px;font-size:12px;line-height:16px;color:var(--mut)}
+input{width:100%;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--fg);font:14px var(--sans);transition:border-color .15s var(--ease)}
+input:hover{border-color:var(--line2)}
+input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.pre{display:flex;align-items:center;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--field);transition:border-color .15s var(--ease)}
+.pre:hover{border-color:var(--line2)}
+.pre:focus-within{outline:2px solid var(--acc);outline-offset:1px}
+.pre span{padding-left:12px;font:12px var(--mono);color:var(--mut);white-space:nowrap}
+.pre input{border:0;background:none;padding:0 12px 0 0;font-family:var(--mono);font-size:13px;outline:0}
+
+/* the swap: who gives, which ID moves, who receives */
+.flow{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin:16px 0;padding:16px;background:var(--field);border:1px solid var(--line);border-radius:8px}
+.node{display:flex;align-items:center;gap:8px;min-width:0}
+.node.r{justify-content:flex-end}
+.who{display:flex;flex-direction:column;min-width:0}
+.node.r .who{align-items:flex-end}
+.who b,.who small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.who b{font-weight:400}
+.who small{font:12px/16px var(--mono);color:var(--mut)}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:32px}
+.btn.sm{height:32px;padding:0 12px;border-radius:6px;font-size:13px}
+.dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2);transition:background-color .3s var(--ease)}
+.dot.on{background:var(--acc);box-shadow:none}.dot.done{background:var(--pos);box-shadow:none}
+.link{position:relative;display:flex;align-items:center;justify-content:center;min-width:200px}
+.link::before{content:"";position:absolute;left:0;right:8px;top:50%;height:1px;background:var(--line)}
+.link::after{content:"";position:absolute;right:0;top:50%;width:6px;height:6px;margin-top:-3px;border-top:1px solid var(--mut);border-right:1px solid var(--mut);transform:rotate(45deg)}
+.chip{position:relative;max-width:100%;padding:4px 12px;border:1px solid var(--line);border-radius:6px;background:var(--raised);font:12px/16px var(--mono);color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:border-color .3s var(--ease)}
+.chip.done{border-color:var(--pos)}.chip i{font-style:normal;color:var(--mut)}
+.move{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:0 0 16px;padding:12px 16px;border:1px solid rgba(102,192,244,.4);border-radius:10px;background:var(--raised);font:13px/20px var(--sans);color:var(--fg2)}
+.move code{font:500 15px/20px var(--mono);color:var(--fg)}
+.move code.auto{font:13px/20px var(--sans);color:var(--mut)}
+.move.done{border-color:var(--pos)}
+.lose{flex-basis:100%;font-size:12px;line-height:16px;color:var(--neg)}
+
+.bar{display:flex;align-items:center;gap:16px}
+.bar p{margin:0;font-size:12px;line-height:16px;color:var(--mut)}
+.btn{white-space:nowrap;height:40px;padding:0 20px;border:0;border-radius:6px;background:var(--acc);color:var(--ink);font:500 14px var(--sans);cursor:pointer;transition:background-color .15s var(--ease),transform .15s var(--ease),opacity .15s var(--ease)}
+.btn:hover{background:#8dd0f8}.btn:active{transform:scale(.98)}.btn:disabled{opacity:.5;cursor:default;transform:none}
+.btn.sec{background:var(--raised);color:var(--fg);border:1px solid var(--line)}.btn.sec:hover{background:#344356}
+
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+#prog{margin:12px 0 0;font:12px/16px var(--mono);color:var(--fg2)}
+#guard{display:none;border-color:rgba(102,192,244,.4)}
+#guard .row{display:flex;gap:12px;margin-top:12px}
+#guard input{font-family:var(--mono);letter-spacing:.1em}
+
+.est{display:flex;align-items:flex-start;gap:16px;margin:0 0 16px}
+.estt{display:flex;flex-direction:column;gap:2px;min-width:0;font:12px/20px var(--mono);color:var(--fg2)}
+.estt p{margin:0}.estt .e{color:var(--neg)}
+.sl{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:0 0 16px}
+@media(max-width:760px){.sl{grid-template-columns:1fr}}
+.sl label{display:flex;justify-content:space-between;gap:8px}.sl b{font:12px/16px var(--mono);color:var(--fg);font-weight:400}
+input[type=range]{height:20px;padding:0;border:0;background:none;accent-color:var(--acc);cursor:pointer}
+.log{flex:none;display:flex;flex-direction:column}
+.log h2{margin-bottom:12px}
+#log{height:288px;overflow:auto;font:12px/20px var(--mono);color:var(--fg2)}
+#log div{display:flex;gap:12px}#log time{flex:none;color:var(--mut)}
+#log .ok{color:var(--pos)}#log .bad{color:var(--neg)}
+#foot{display:none;position:fixed;left:0;right:0;bottom:0;z-index:5;gap:12px;align-items:center;height:32px;padding:0 32px;background:var(--card);border-top:1px solid var(--line);font:12px/20px var(--mono);color:var(--fg2);cursor:pointer;white-space:nowrap;overflow:hidden}
+#foot.show{display:flex}#foot time{flex:none;color:var(--mut)}#foot span{overflow:hidden;text-overflow:ellipsis}
+#foot .ok{color:var(--pos)}#foot .bad{color:var(--neg)}
+.ver{display:flex;align-items:center;justify-content:space-between;gap:16px;font:12px/16px var(--sans);color:var(--mut)}
+.ver label{display:flex;align-items:center;gap:8px;margin:0;color:var(--fg2);cursor:pointer}
+.ver input{width:16px;height:16px;padding:0;accent-color:var(--acc);cursor:pointer}
+#empty{color:var(--mut);font:13px/20px var(--sans)}
+textarea{width:100%;min-height:72px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--fg);font:13px/20px var(--mono);resize:vertical;transition:border-color .15s var(--ease)}
+textarea:hover{border-color:var(--line2)}textarea:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+#mList{max-height:312px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.sub{margin-top:20px;padding-top:20px;border-top:1px solid var(--line)}
+.sub h3{margin:0;font-size:14px;line-height:20px;font-weight:500}
+.ar{display:grid;grid-template-columns:20px minmax(0,1.3fr) minmax(0,1.4fr) minmax(0,1fr) 200px;align-items:center;gap:12px;min-height:44px;padding:4px 12px;border-bottom:1px solid var(--line);font-size:13px}
+.ar:last-child{border-bottom:0}
+.ar.h .s{padding:0;border:0;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;white-space:nowrap}.ar.h .s:hover{color:var(--fg)}
+.ar.h{position:sticky;top:0;z-index:1;min-height:32px;background:var(--card);font-size:12px;color:var(--mut)}
+.ar input[type=checkbox]{width:16px;height:16px;padding:0;accent-color:var(--acc);cursor:pointer}
+.ar .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ar .m{font:12px/16px var(--mono);color:var(--fg2)}
+.ar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:16px;color:var(--mut)}
+.ar small.e{color:var(--neg)}
+.ar.none{display:block;color:var(--mut)}
+.ar:not(.h):not(.none):not(.d){cursor:pointer}.ar:not(.h):not(.none):not(.d):hover{background:rgba(199,213,224,.05)}
+.ar:has(+ .ar.d){border-bottom-color:transparent}
+.ar .btns{flex-wrap:nowrap;justify-content:flex-end}
+.ar.d{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:0;padding:4px 12px 12px 44px;background:rgba(199,213,224,.05);font:12px/20px var(--mono);color:var(--fg2);user-select:text}
+.ar.d .x{flex:1 1 160px;min-width:0;overflow-wrap:anywhere}
+@media(max-width:760px){.ar{grid-template-columns:20px minmax(0,1fr) auto}.ar .m,.ar.h>:nth-child(3),.ar.h>:nth-child(4){display:none}}
+</style></head><body>
+<header><div class="in">
+  <h1><img class="logo" alt="" src="data:image/png;base64,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"><span data-i="title"></span></h1>
+  <div class="top">
+  <button class="btn sec sm" id="upd" data-i="upd"></button><button class="btn sec sm" id="gh" data-i="gh"></button>
+  <div class="lang" role="group" aria-label="Language">
+    <button data-lang="ru" aria-pressed="false">RU</button>
+    <button data-lang="en" aria-pressed="false">EN</button>
+  </div>
+  </div>
+</div></header>
+<div class="app">
+
+<section class="card" id="swp">
+<div class="hd"><h2 data-i="swapTitle"></h2></div>
+<div class="grid">
+  <section class="card">
+    <h2><span data-i="acc"></span> 1</h2>
+    <p class="cap" data-i="cap1"></p>
+    <div class="field"><label for="l1" data-i="login"></label><input id="l1" autocomplete="off" spellcheck="false"></div>
+    <div class="field"><label for="p1" data-i="password"></label><input id="p1" type="password" autocomplete="off"></div>
+    <div class="field"><label for="s1">shared_secret</label><input id="s1" type="password" autocomplete="off"><div class="hint" data-i="secretHint"></div></div>
+  </section>
+  <section class="card">
+    <h2><span data-i="acc"></span> 2</h2>
+    <p class="cap" data-i="cap2"></p>
+    <div class="field"><label for="l2" data-i="login"></label><input id="l2" autocomplete="off" spellcheck="false"></div>
+    <div class="field"><label for="p2" data-i="password"></label><input id="p2" type="password" autocomplete="off"></div>
+    <div class="field"><label for="s2">shared_secret</label><input id="s2" type="password" autocomplete="off"><div class="hint" data-i="secretHint"></div></div>
+  </section>
+</div>
+
+<section class="card">
+  <div class="hd"><h2 data-i="idTitle"></h2><button class="btn sec sm" id="load" data-i="load"></button></div>
+  <div class="flow" aria-hidden="true">
+    <div class="node"><span class="dot" id="d1"></span><div class="who"><b id="n1"></b><small id="i1"></small></div></div>
+    <div class="link"><span class="chip" id="chip"></span></div>
+    <div class="node r"><div class="who"><b id="n2"></b><small id="i2"></small></div><span class="dot" id="d2"></span></div>
+  </div>
+  <div class="move" id="move"><span data-i="idMove"></span><code id="mv"></code><div class="lose" id="lose"></div></div>
+  <div class="field" style="margin:0"><label for="temp" data-i="idTemp"></label><div class="pre"><span>/id/</span><input id="temp" autocomplete="off" spellcheck="false"></div><div class="hint" data-i="idTempHint"></div></div>
+</section>
+
+<section class="card" id="guard">
+  <h2 data-i="guardTitle"></h2>
+  <p class="cap" id="gcap" style="margin:4px 0 0"></p>
+  <div class="row"><input id="code" autocomplete="off" spellcheck="false" aria-label="Steam Guard"><button class="btn sec" id="send" data-i="send"></button><button class="btn sec" id="skip" data-i="skipLogin"></button></div>
+</section>
+
+<div class="bar"><button class="btn" id="go"></button><p data-i="privacy"></p></div>
+</section>
+
+<section class="card" id="mgr">
+  <div class="hd"><h2 data-i="mgrTitle"></h2>
+    <div class="btns"><button class="btn sec sm" id="mAll" data-i="mgrAll"></button><button class="btn sec sm" id="mNone" data-i="mgrNone"></button><button class="btn sec sm" id="mNoId" data-i="mgrNoId"></button><button class="btn sec sm" id="mRefresh"></button></div></div>
+  <p class="cap" data-i="mgrCap" style="margin:4px 0 12px"></p>
+  <div id="mList"></div>
+  <p class="cap" id="mSel" style="margin:8px 0 0"></p>
+  <div class="sub">
+    <div class="field" style="margin:0"><label for="mAdd" data-i="mgrAddLabel"></label><textarea id="mAdd" spellcheck="false" autocomplete="off"></textarea><div class="hint" data-i="mgrAddHint"></div></div>
+    <div class="btns" style="margin-top:12px"><button class="btn sec sm" id="mAddBtn" data-i="mgrAdd"></button><button class="btn sec sm" id="mAddFile" data-i="mgrAddFile"></button></div>
+  </div>
+  <div class="sub">
+    <h3 data-i="mgrCfgTitle"></h3>
+    <div class="field" style="margin:12px 0 0"><label for="mPass" data-i="mgrPassLabel"></label><input id="mPass" autocomplete="off" spellcheck="false"><div class="hint" data-i="mgrPassHint"></div></div>
+    <div class="btns" style="margin-top:12px"><button class="btn sec sm" id="mExport" data-i="mgrExport"></button><button class="btn sec sm" id="mFile" data-i="mgrFile"></button><button class="btn sec sm" id="mImport" data-i="mgrImport"></button></div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="hd"><h2 data-i="huntTitle"></h2>
+    <div class="btns"><button class="btn sec sm" id="openIds" data-i="huntIds"></button><button class="btn sec sm" id="dir" data-i="huntOpen"></button></div></div>
+  <p class="cap" data-i="huntCap" style="margin:4px 0 12px"></p>
+  <div class="est"><button class="btn sec sm" id="count" data-i="huntCount"></button>
+    <div class="estt"><p id="hSel"></p><p id="hCount"></p><p id="hTime"></p></div></div>
+  <div class="sl">
+    <div><label for="rGap"><span data-i="sGap"></span><b id="vGap"></b></label><input type="range" id="rGap" min="2" max="100" step="1" value="60"></div>
+    <div><label for="rTimeout"><span data-i="sTimeout"></span><b id="vTimeout"></b></label><input type="range" id="rTimeout" min="2" max="60" step="1" value="8"></div>
+    <div><label for="rRate"><span data-i="sRate"></span><b id="vRate"></b></label><input type="range" id="rRate" min="1" max="120" step="1" value="5"></div>
+  </div>
+  <p class="hint" data-i="sHint" style="margin:-8px 0 16px"></p>
+  <div class="bar"><button class="btn" id="hunt"></button><button class="btn sec sm" id="openFound" data-i="huntFound"></button><button class="btn sec sm" id="openClaimed" data-i="huntClaimed"></button><p data-i="huntHint"></p></div>
+  <p id="prog"></p>
+</section>
+
+<section class="card log">
+  <h2 data-i="logTitle"></h2>
+  <div id="log"></div>
+</section>
+<div class="ver"><span id="ver"></span><label><input type="checkbox" id="updAuto"><span data-i="updAuto"></span></label></div>
+</div>
+<div id="foot" role="status"><time></time><span></span></div>
+
+<script>
+const I={
+ru:{title:'SteamIDManager',swapTitle:'Swapper',acc:'Аккаунт',cap1:'Сейчас владеет ID',cap2:'Получит ID',login:'Логин',password:'Пароль',
+  secretHint:'Необязательно. Для автоматических кодов Steam Guard',idTitle:'ID профиля',idMove:'Перейдёт ко 2-му аккаунту:',moveAuto:'текущий ID аккаунта 1, он определится при обмене',
+  idTemp:'Временный ID для аккаунта 1',idTempHint:'Если пусто, будет случайный',run:'Выполнить обмен',running:'Выполняется…',
+  privacy:'Пароли аккаунтов 1 и 2 хранятся только в памяти и нигде не сохраняются',guardTitle:'Код Steam Guard',guardApp:'Аккаунт {n}: код из приложения Steam Guard',
+  guardMail:'Аккаунт {n}: код отправлен на почту …@{d}',send:'Отправить',skipLogin:'Отменить вход',accCancelled:'Аккаунт {login}: вход отменён, пропущен',mgrCopyLogin:'Копировать логин',mgrCopyPw:'Копировать пароль',mgrCopied:'Скопировано',logTitle:'Журнал',logEmpty:'Здесь появится ход выполнения',
+  err:'Ошибка',fillAcc:'Заполните логины и пароли обоих аккаунтов',
+  codeTimeout:'Аккаунт {n}: код Steam Guard не введён за 2 минуты. Ничего не изменено, повторите',
+  loginTimeout:'Аккаунт {n}: вход не завершился за 5 минут (Steam недоступен или не отвечает). Ничего не изменено, повторите позже',
+  badTemp:'Временный ID: 3–32 латинских буквы, цифры, «_» или «-». Ничего не изменено',
+  loseId:'ID аккаунта 2 /id/{id} освободится: его сможет занять кто угодно',loseAny:'Прежний ID аккаунта 2 освободится: его сможет занять кто угодно',
+  confirm:'Перенести ID аккаунта 1 на аккаунт 2?',again:'Чтобы повторить обмен, сначала нажмите «Загрузить текущие ID»',guardWrong:'Код не подошёл, введите новый. ',
+  noId1:'У аккаунта 1 не задан собственный ID, переносить нечего. Ничего не изменено',
+  waitRate:'Аккаунт {n}: Steam просит подождать (429), повтор через {s} с. Ответ Steam: {d}',
+  firstFail:'Аккаунт 1: не удалось сменить ID ({msg}). Проверьте в профиле, не поменялся ли он',
+  load:'Загрузить текущие ID',loaded:'Аккаунт {n}: текущий ID «{id}»',noId:'Аккаунт {n}: свой ID не задан',
+  start:'Вхожу в оба аккаунта…',loggedIn:'Аккаунт {n}: вход выполнен',session:'Аккаунт {n}: веб-сессия готова',
+  moved:'Аккаунт 1: ID изменён на «{temp}», «{target}» свободен',retry:'Аккаунт 2: попытка {i} не удалась: {msg}',
+  rollback:'Откат: аккаунт 1 снова владеет «{target}»',
+  rollbackFail:'Откат не удался ({msg}). Состояние неизвестно: аккаунт 1 мог остаться с «{temp}», а «{target}» мог перейти ко 2-му аккаунту или освободиться. Проверьте оба профиля в браузере и при необходимости задайте ID вручную',
+  noProfile:'Аккаунт {n}: страница редактирования профиля недоступна. Ничего не изменено. Профиль сообщества не настроен или аккаунт ограничен: откройте steamcommunity.com, настройте профиль и повторите. Что вернул Steam: {d}',
+  rateLimit:'Аккаунт {n}: Steam отвечает ошибкой 429 даже после ожидания. Ничего не изменено, подождите 5–10 минут и повторите. Ответ Steam: {d}',
+  ready:'Проверка пройдена, переношу «{target}» со 1-го аккаунта на 2-й',
+  done:'Готово: аккаунт 2 теперь владеет «{target}»',
+  huntTitle:'Поиск свободных ID',huntIds:'Открыть список ID',huntCount:'Посчитать ID',huntFound:'Открыть найденные',huntClaimed:'Открыть занятые',mgrAddFile:'Добавить из файла',
+  hSel:'Выбрано аккаунтов: {n} из {m}',hSelSkip:'Выбрано аккаунтов: {s} из {m}, в поиске: {n} (у остальных уже есть ID)',hCount:'ID для поиска: {n}',hBad:'неверных пропущено: {n}',hNone:'В ids.txt нет ID для поиска',
+  hTime:'Примерное время при паузе {g}: {d}',hTime429:'Пауза меньше 5 с: Steam будет отвечать ошибкой 429. Время при паузе {g}: {d}',unitH:'ч',unitM:'мин',huntOpen:'Открыть папку',huntRun:'Искать и занимать',huntStop:'Остановить',
+  huntCap:'Проверяет ID из ids.txt, свободные записывает в available.txt и занимает аккаунтами, отмеченными в менеджере: один ID на аккаунт, регистр как в списке',
+  huntHint:'Нужны аккаунты без своего ID. Пароли лежат в accounts.txt открытым текстом, не передавайте файл',
+  huntConfirm:'Искать ID из ids.txt и занимать найденные выбранными аккаунтами ({n})?',
+  huntManual:'Аккаунтов без shared_secret, у которых есть Steam Guard: {n}. Для них код придётся вводить вручную (2 минуты на ответ)',huntProg:'Проверено {checked} из {total}, свободных {found}, занято {claimed}',huntLive:'Поиск идёт: проверено {checked} из {total}, свободных {found}, занято {claimed}',
+  noIds:'В ids.txt нет ID для проверки (3–32 символа: латинские буквы, цифры, «_», «-») или все уже заняты по claimed.txt',
+  badIds:'Пропущено неверных ID в ids.txt: {n}',badAccounts:'Пропущено неверных строк в accounts.txt: {n} (нужен формат login:password)',
+  huntStart:'Проверяю ID: {t}, аккаунтов: {a}',huntWait:'Steam просит подождать (429), пауза {s} с, интервал между запросами теперь {g} с',huntUnknown:'«{id}»: ответ Steam неясен, пропущен',
+  found:'Свободен: «{id}»',noSpare:'«{id}»: записан в available.txt, но свободного аккаунта для него нет',
+  accHasId:'Аккаунт {login}: уже есть свой ID «{id}», пропущен (он бы его потерял)',accFail:'Аккаунт {login}: не удалось подготовить ({msg}), пропущен',
+  claimed:'«{id}» занят аккаунтом {login}',claimFail:'«{id}»: аккаунт {login} не смог занять ID ({msg})',accCooldown:'Аккаунт {login} в таймауте на смену ID, отдыхает {m} мин, «ID» пробует следующий аккаунт',
+  unit:'с',sGap:'Пауза между проверками',sTimeout:'Таймаут запроса',sRate:'Пауза после 429',
+  sHint:'Ползунки работают и во время поиска. После 429 пауза между проверками сама растёт от выбранной и потом возвращается к ней',
+  fileFail:'Не удалось записать в {file} ({msg}). Добавьте строку вручную: {line}',
+  mgrTitle:'Менеджер аккаунтов',mgrCap:'Аккаунты хранятся в accounts.txt. Отметьте, какие использовать в поиске и в проверке (Shift+клик — отметить диапазон). Клик по аккаунту показывает его пароль. «Проверить» входит в отмеченные аккаунты и узнаёт SteamID64 и свой ID',
+  mgrAll:'Выбрать все',mgrNone:'Снять все',mgrNoId:'Выбрать без ID',mgrRefresh:'Проверить выбранные',mgrStop:'Остановить',
+  mgrPw:'пароль',mgrImport:'Импорт из текста',mgrFile:'Выбрать файл конфига',mgrExport:'Скачать конфиг',mgrCfgTitle:'Перенос аккаунтов',mgrPassLabel:'Пароль конфига',
+  mgrPassHint:'Им шифруется скачиваемый файл (от 5 символов, с цифрой и заглавной буквой), тот же пароль нужен при импорте. Для импорта введите пароль и выберите файл .vsa, либо вставьте его текст в поле «Добавить аккаунты» выше',
+  mgrExported:'Конфиг сохранён: {file}',passWeak:'Пароль конфига: минимум 5 символов, с цифрой и заглавной буквой',huntSkipId:'Пропущено аккаунтов, у которых уже есть ID: {n} (нажмите «Проверить выбранные» в менеджере, чтобы обновить данные)',huntLoginLimit:'Steam ограничил частоту входов или запросов: аккаунты пока не берутся, при следующей находке попробую снова',upd:'Обновление',gh:'GitHub',updAuto:'Проверять обновления при запуске',updNew:'Доступна новая версия {v}: нажмите «Обновление», чтобы скачать',updLatest:'У вас последняя версия ({v})',updNone:'Релизов на GitHub пока нет',updFail:'Не удалось проверить обновления',verText:'Версия {v}',noLink:'Ссылка на GitHub ещё не задана в программе',noAccounts:'Нет аккаунтов для экспорта',
+  badConfig:'Это не конфиг VanitySwap: текст должен начинаться с VSA1.',badPass:'Неверный пароль или файл повреждён',
+  mgrAddLabel:'Добавить аккаунты',mgrAddHint:'По одному в строке: логин:пароль или логин:пароль:shared_secret (тогда коды Steam Guard вводятся сами). Известный логин получит новый пароль',mgrAdd:'Добавить',
+  mgrEmpty:'Аккаунтов пока нет, добавьте их ниже',mgrSteamId:'SteamID64',mgrId:'Свой ID',mgrClear:'Очистить ID',mgrRemove:'Удалить',
+  mgrClearConfirm:'Полностью удалить ID /id/{id} у аккаунта {login}? Профиль останется только по номеру, а ID сможет занять кто угодно: вернуть его может не получиться.',
+  mgrRemoveConfirm:'Удалить аккаунт {login} из accounts.txt? Его пароль будет стёрт из файла.',
+  mgrSel:'Для поиска выбрано: {n} из {m}',mgrSecret:'shared_secret задан',mgrManual:'нужен код Steam Guard вручную',
+  mgrAdded:'Добавлено аккаунтов: {added}, обновлено: {updated}',
+  accChecked:'Аккаунт {login}: SteamID64 {steamId}, ID {id}',accCheckFail:'Аккаунт {login}: не удалось проверить ({msg})',
+  accRateLimit:'Steam ограничил число входов, проверка остановлена. Подождите несколько минут и повторите',refreshDone:'Проверка завершена: успешно {ok}, с ошибкой {fail}',
+  idCleared:'Аккаунт {login}: ID «{id}» удалён, Steam больше его не показывает',noIdToClear:'Аккаунт {login}: своего ID нет, очищать нечего',
+  clearChanged:'Аккаунт {login}: сейчас у него ID «{id}», а не «{expect}». Ничего не изменено, проверьте и повторите',
+  clearKept:'Аккаунт {login}: Steam принял запрос, но ID «{id}» остался. Так его не очистить, смените ID вручную на сайте steamcommunity.com',
+  accMissing:'Аккаунта {login} нет в accounts.txt',
+  huntDone:'Готово: проверено {checked} из {total}, свободных {found}, занято {claimed}',huntStopped:'Остановлено: проверено {checked} из {total}, свободных {found}, занято {claimed}'},
+en:{title:'SteamIDManager',swapTitle:'Swapper',acc:'Account',cap1:'Owns the ID now',cap2:'Receives the ID',login:'Login',password:'Password',
+  secretHint:'Optional. Generates Steam Guard codes automatically',idTitle:'Profile ID',idMove:'Will move to account 2:',moveAuto:'account 1’s current ID, read at swap time',
+  idTemp:'Temporary ID for account 1',idTempHint:'Random if left empty',run:'Run swap',running:'Running…',
+  privacy:'Passwords of accounts 1 and 2 stay in memory and are never saved',guardTitle:'Steam Guard code',guardApp:'Account {n}: code from the Steam Guard app',
+  guardMail:'Account {n}: code sent to …@{d}',send:'Submit',skipLogin:'Cancel login',accCancelled:'Account {login}: login cancelled, skipped',mgrCopyLogin:'Copy login',mgrCopyPw:'Copy password',mgrCopied:'Copied',logTitle:'Log',logEmpty:'Progress will appear here',
+  err:'Error',fillAcc:'Fill in logins and passwords for both accounts',
+  codeTimeout:'Account {n}: no Steam Guard code entered within 2 minutes. Nothing was changed, try again',
+  loginTimeout:'Account {n}: sign-in did not finish within 5 minutes (Steam is unreachable or not answering). Nothing was changed, try again later',
+  badTemp:'Temporary ID: 3–32 Latin letters, digits, “_” or “-”. Nothing was changed',
+  loseId:'Account 2’s current ID /id/{id} will be released: anyone could take it',loseAny:'Account 2’s current ID will be released: anyone could take it',
+  confirm:'Move account 1’s ID to account 2?',again:'To swap again, press “Load current IDs” first',guardWrong:'The code was not accepted, enter a new one. ',
+  noId1:'Account 1 has no custom ID, nothing to move. Nothing was changed',
+  waitRate:'Account {n}: Steam asks to wait (429), retrying in {s} s. Steam said: {d}',
+  firstFail:'Account 1: could not change the ID ({msg}). Check in the profile whether it changed anyway',
+  load:'Load current IDs',loaded:'Account {n}: current ID “{id}”',noId:'Account {n}: no custom ID set',
+  start:'Signing in to both accounts…',loggedIn:'Account {n}: signed in',session:'Account {n}: web session ready',
+  moved:'Account 1: ID changed to “{temp}”, “{target}” is free',retry:'Account 2: attempt {i} failed: {msg}',
+  rollback:'Rollback: account 1 owns “{target}” again',
+  rollbackFail:'Rollback failed ({msg}). The state is unknown: account 1 may still have “{temp}”, and “{target}” may have moved to account 2 or be free. Check both profiles in the browser and set the ID manually if needed',
+  noProfile:'Account {n}: the profile edit page is unavailable. Nothing was changed. The community profile is not set up or the account is limited: open steamcommunity.com, set up the profile and try again. What Steam returned: {d}',
+  rateLimit:'Account {n}: Steam keeps answering 429 even after waiting. Nothing was changed, wait 5–10 minutes and try again. Steam said: {d}',
+  ready:'Check passed, moving “{target}” from account 1 to account 2',
+  done:'Done: account 2 now owns “{target}”',
+  huntTitle:'Free ID search',huntIds:'Open ID list',huntCount:'Count IDs',huntFound:'Open found',huntClaimed:'Open claimed',mgrAddFile:'Add from file',
+  hSel:'Accounts selected: {n} of {m}',hSelSkip:'Accounts selected: {s} of {m}, in the search: {n} (the others already have an ID)',hCount:'IDs to search: {n}',hBad:'invalid skipped: {n}',hNone:'ids.txt has no IDs to search',
+  hTime:'Estimated time at a pause of {g}: {d}',hTime429:'A pause under 5 s: Steam will answer with error 429. Time at a pause of {g}: {d}',unitH:'h',unitM:'min',huntOpen:'Open folder',huntRun:'Search and claim',huntStop:'Stop',
+  huntCap:'Checks the IDs in ids.txt, saves free ones to available.txt and claims them with the accounts ticked in the manager: one ID per account, the case as listed',
+  huntHint:'Accounts must have no custom ID. Passwords are in accounts.txt as plain text, do not share the file',
+  huntConfirm:'Check the IDs in ids.txt and claim the free ones with the selected accounts ({n})?',
+  huntManual:'Accounts without a shared_secret that have Steam Guard: {n}. Their code has to be typed by hand (2 minutes to answer)',huntProg:'Checked {checked} of {total}, free {found}, claimed {claimed}',huntLive:'Search is running: checked {checked} of {total}, free {found}, claimed {claimed}',
+  noIds:'ids.txt has no IDs to check (3–32 Latin letters, digits, “_” or “-”), or all are already in claimed.txt',
+  badIds:'Invalid IDs skipped in ids.txt: {n}',badAccounts:'Invalid lines skipped in accounts.txt: {n} (use login:password)',
+  huntStart:'Checking IDs: {t}, accounts: {a}',huntWait:'Steam asks to wait (429), pausing {s} s, the pause between requests is now {g} s',huntUnknown:'“{id}”: unclear Steam answer, skipped',
+  found:'Free: “{id}”',noSpare:'“{id}”: saved to available.txt, but no spare account is left for it',
+  accHasId:'Account {login}: already has the custom ID “{id}”, skipped (it would lose it)',accFail:'Account {login}: could not be prepared ({msg}), skipped',
+  claimed:'“{id}” claimed by account {login}',claimFail:'“{id}”: account {login} could not claim the ID ({msg})',accCooldown:'Account {login} is in its ID-change cooldown, resting {m} min, the ID goes to the next account',
+  unit:'s',sGap:'Pause between checks',sTimeout:'Request timeout',sRate:'Pause after a 429',
+  sHint:'The sliders also work during a search. After a 429 the pause between checks grows by itself from the chosen one, then returns to it',
+  fileFail:'Could not write to {file} ({msg}). Add the line by hand: {line}',
+  mgrTitle:'Account manager',mgrCap:'Accounts are kept in accounts.txt. Tick the ones to use in the search and in the check (Shift+click ticks a range). Click an account to see its password. “Check” signs in to the ticked accounts and reads their SteamID64 and custom ID',
+  mgrAll:'Select all',mgrNone:'Clear all',mgrNoId:'Select without ID',mgrRefresh:'Check selected',mgrStop:'Stop',
+  mgrPw:'password',mgrImport:'Import from text',mgrFile:'Choose config file',mgrExport:'Download config',mgrCfgTitle:'Move accounts',mgrPassLabel:'Config password',
+  mgrPassHint:'It encrypts the downloaded file (at least 5 characters, with a digit and a capital letter); the same password is needed to import it. To import, enter the password and choose the .vsa file, or paste its text into “Add accounts” above',
+  mgrExported:'Config saved: {file}',passWeak:'Config password: at least 5 characters, with a digit and a capital letter',huntSkipId:'Skipped accounts that already have an ID: {n} (press Check selected in the manager to refresh what is known)',huntLoginLimit:'Steam limited sign-ins or requests: accounts are not taken for now, I will try again on the next find',upd:'Update',gh:'GitHub',updAuto:'Check for updates on start',updNew:'New version {v} is available: press Update to download it',updLatest:'You have the latest version ({v})',updNone:'No releases on GitHub yet',updFail:'Could not check for updates',verText:'Version {v}',noLink:'The GitHub link is not set in the program yet',noAccounts:'No accounts to export',
+  badConfig:'This is not a VanitySwap config: the text must start with VSA1.',badPass:'Wrong password or the file is damaged',
+  mgrAddLabel:'Add accounts',mgrAddHint:'One per line: login:password or login:password:shared_secret (then Steam Guard codes are entered automatically). A known login gets the new password',mgrAdd:'Add',
+  mgrEmpty:'No accounts yet, add them below',mgrSteamId:'SteamID64',mgrId:'Custom ID',mgrClear:'Clear ID',mgrRemove:'Delete',
+  mgrClearConfirm:'Remove the ID /id/{id} of account {login} completely? The profile will be reachable only by its number and anyone could take the ID: getting it back may not be possible.',
+  mgrRemoveConfirm:'Delete account {login} from accounts.txt? Its password will be erased from the file.',
+  mgrSel:'Selected for the search: {n} of {m}',mgrSecret:'shared_secret set',mgrManual:'needs a Steam Guard code by hand',
+  mgrAdded:'Accounts added: {added}, updated: {updated}',
+  accChecked:'Account {login}: SteamID64 {steamId}, ID {id}',accCheckFail:'Account {login}: could not be checked ({msg})',
+  accRateLimit:'Steam limited the number of sign-ins, the check was stopped. Wait a few minutes and try again',refreshDone:'Check finished: {ok} ok, {fail} failed',
+  idCleared:'Account {login}: the ID “{id}” was removed, Steam no longer shows it',noIdToClear:'Account {login}: no custom ID, nothing to clear',
+  clearChanged:'Account {login}: it has the ID “{id}” now, not “{expect}”. Nothing was changed, check and try again',
+  clearKept:'Account {login}: Steam accepted the request but the ID “{id}” is still there. It cannot be cleared this way, change it by hand on steamcommunity.com',
+  accMissing:'Account {login} is not in accounts.txt',
+  huntDone:'Done: checked {checked} of {total}, free {found}, claimed {claimed}',huntStopped:'Stopped: checked {checked} of {total}, free {found}, claimed {claimed}'}
+};
+const $=id=>document.getElementById(id);
+const store={get(){try{return localStorage.getItem('lang')}catch{}},set(v){try{localStorage.setItem('lang',v)}catch{}}};
+let lang=store.get()||'en';
+const t=(k,p={})=>(I[lang][k]||k).replace(/\{(\w+)\}/g,(_,x)=>p[x]??'');
+const pad=n=>String(n).padStart(2,'0');
+const entries=[],cur={1:'',2:''};let accs=[],refreshing=false,busy=false,hunting=false,prog=null,guard=null,moved='',swapped=false,loaded=false; // swapped: IDs changed, running again would move the temporary ID
+const hideGuard=()=>{$('guard').style.display='none';guard=null};
+const lock=v=>{busy=v;renderAcc();$('go').disabled=v||swapped;$('load').disabled=v;$('hunt').disabled=v&&!hunting;if(!v)hideGuard()};
+const gtext=()=>(guard.w?t('guardWrong'):'')+(guard.d?t('guardMail',{n:guard.n,d:guard.d}):t('guardApp',{n:guard.n}));
+
+function render(){
+  document.documentElement.lang=lang;
+  document.querySelectorAll('[data-i]').forEach(e=>e.textContent=t(e.dataset.i));
+  $('ver').textContent=appVer?t('verText',{v:appVer}):'';
+  document.querySelectorAll('[data-lang]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lang===lang));
+  $('go').textContent=t(busy&&!hunting?'running':'run');
+  $('hunt').textContent=t(hunting?'huntStop':'huntRun');
+  $('mRefresh').textContent=t(refreshing?'mgrStop':'mgrRefresh');
+  $('prog').textContent=prog?t('huntProg',prog):'';
+  showTune();
+  flow();
+  if(guard)$('gcap').textContent=gtext();
+  const log=$('log'),keep=log.scrollTop,atEnd=keep+log.clientHeight>=log.scrollHeight-24; // stay at the end only if the reader is there
+  log.textContent='';
+  foot();
+  if(!entries.length){const e=document.createElement('div');e.id='empty';e.textContent=t('logEmpty');log.append(e);return}
+  for(const x of entries){
+    const row=document.createElement('div'),tm=document.createElement('time'),m=document.createElement('span');
+    tm.textContent=x.time;m.textContent=t(x.key,x.p)+(x.raw?': '+x.raw:'');
+    if(x.cls)m.className=x.cls;
+    row.append(tm,m);log.append(row);
+  }
+  log.scrollTop=atEnd?log.scrollHeight:keep;
+}
+// the last journal line, pinned to the bottom of the window while the journal itself is scrolled out of view
+function foot(){
+  const x=entries[entries.length-1],f=$('foot');
+  f.querySelector('time').textContent=x?x.time:'';
+  const m=f.querySelector('span');m.textContent=x?t(x.key,x.p)+(x.raw?': '+x.raw:''):'';m.className=x&&x.cls||'';
+  f.dataset.has=x?'1':'';f.classList.toggle('show',!!x&&!seen);
+}
+let seen=true;
+new IntersectionObserver(([e])=>{seen=e.isIntersecting;foot()},{rootMargin:'0px 0px -32px 0px'}).observe($('log'));
+$('foot').onclick=()=>$('log').scrollIntoView({behavior:'smooth',block:'center'});
+function flow(){
+  $('n1').textContent=$('l1').value.trim()||t('acc')+' 1';
+  $('n2').textContent=$('l2').value.trim()||t('acc')+' 2';
+  [1,2].forEach(n=>$('i'+n).textContent=cur[n]?'/id/'+cur[n]:'');
+  const id=moved||cur[1]; // the ID that moves: the one account 1 owns
+  $('chip').replaceChildren(Object.assign(document.createElement('i'),{textContent:'/id/'}),document.createTextNode(id||'…'));
+  $('mv').textContent=id?'/id/'+id:t('moveAuto');
+  $('mv').className=id?'':'auto';
+  $('lose').textContent=swapped||(loaded&&!cur[2])?'':cur[2]?t('loseId',{id:cur[2]}):t('loseAny');
+}
+function push(key,p,cls,raw){
+  const d=new Date();
+  // a long search must not slow the window down: the oldest line goes, noise (pauses, counts) before anything that matters
+  if(entries.length>=500){const i=entries.findIndex(e=>['huntWait','huntUnknown','waitRate','huntLive'].includes(e.key));entries.splice(i<0?0:i,1)}
+  entries.push({key,p,cls,raw,time:`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`});
+  render();
+}
+// one journal line that keeps counting while the search runs; after another entry (a pause, a find) the next count starts a new line
+function live(st){
+  const last=entries[entries.length-1];
+  if(last&&last.key==='huntLive'){
+    last.p=st;
+    const row=$('log').lastElementChild;
+    if(row&&row.lastChild)row.lastChild.textContent=t('huntLive',st);
+    foot();return;
+  }
+  push('huntLive',st);
+}
+const dot=(n,s)=>{$('d'+n).className='dot '+(s||'')};
+
+api.onLog((key,p)=>{
+  if(key==='accChecked')p={...p,id:p.id||'—'};
+  push(key,p,['done','ready','found','claimed','huntDone','accChecked','refreshDone','idCleared','mgrExported'].includes(key)?'ok':['passWeak','noAccounts','huntLoginLimit','noLink','badConfig','badPass','retry','rollbackFail','noProfile','rateLimit','waitRate','firstFail','huntWait','huntUnknown','badIds','badAccounts','accHasId','accFail','noSpare','claimFail','accCooldown','fileFail','accCheckFail','accRateLimit','clearChanged','clearKept','accMissing'].includes(key)?'bad':'');
+  if(key==='huntStart')live({checked:0,total:p.t,found:0,claimed:0}); // the line that then keeps counting
+  if(key==='session'&&(p.n===1||p.n===2))dot(p.n,'on'); // the search names accounts by login
+  if(key==='ready'){moved=p.target;flow()}
+  if(key==='done'){dot(1,'done');dot(2,'done');$('chip').classList.add('done');$('move').classList.add('done')}
+});
+api.onAskCode((n,d,w)=>{guard={n,d,w};$('guard').style.display='block';$('gcap').textContent=gtext();$('code').value='';$('code').focus()});
+function sendCode(){const v=$('code').value.trim();if(!v)return;api.sendCode(v);$('code').value='';hideGuard()}
+$('send').onclick=sendCode;
+$('skip').onclick=()=>{api.cancelCode();hideGuard()}; // this account is skipped, the others go on
+$('code').onkeydown=e=>{if(e.key==='Enter')sendCode()};
+document.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;store.set(lang);render();renderAcc()});
+['l1','l2'].forEach(id=>$(id).addEventListener('input',flow));
+['l1','p1','l2','p2'].forEach(id=>$(id).addEventListener('input',()=>{cur[1]=cur[2]='';moved='';swapped=loaded=false;$('go').disabled=busy;flow()})); // loaded IDs belong to the old logins
+
+const creds=()=>({a1:{login:$('l1').value.trim(),password:$('p1').value,secret:$('s1').value.trim()},
+  a2:{login:$('l2').value.trim(),password:$('p2').value,secret:$('s2').value.trim()}});
+const fail=r=>{
+  dot(1);dot(2);
+  if(r.error.key)push(r.error.key,r.error.p||{},'bad');
+  else push('err',{},'bad',(r.error.acc?t('acc')+' '+r.error.acc+': ':'')+r.error.msg);
+};
+
+const reset=()=>{entries.length=0;moved='';dot(1);dot(2);$('chip').classList.remove('done');$('move').classList.remove('done')};
+$('load').onclick=async()=>{
+  reset();lock(true);render();
+  const r=await api.loadIds(creds());
+  if(r&&r.ok)swapped=false; // fresh IDs are known, running again is safe
+  lock(false);
+  if(r&&r.error)fail(r);
+  else if(r&&r.ok){cur[1]=r.result[1];cur[2]=r.result[2];loaded=true}
+  render();
+};
+
+$('go').onclick=async()=>{
+  if(!confirm([t('confirm'),cur[1]&&'/id/'+cur[1]+' → '+t('acc')+' 2',$('lose').textContent].filter(Boolean).join('\n')))return;
+  reset();lock(true);render();
+  const r=await api.start({...creds(),temp:$('temp').value.trim()});
+  if(r&&r.ok)swapped=true;
+  lock(false);
+  if(r&&r.error)fail(r);
+  else if(r&&r.ok){cur[1]=cur[2]='';loaded=false;push('again',{},'')} // IDs changed, loaded values are stale
+  render();
+};
+// sliders: base pause between checks (tenths of a second), request timeout and first pause after a 429 (seconds); saved, and live during a run
+const tuneKey='tune';
+const tune=()=>({gap:$('rGap').value*100,timeout:$('rTimeout').value*1000,rateWait:$('rRate').value*1000});
+function showTune(){
+  $('vGap').textContent=($('rGap').value/10).toFixed(1)+' '+t('unit');
+  $('vTimeout').textContent=$('rTimeout').value+' '+t('unit');
+  $('vRate').textContent=$('rRate').value+' '+t('unit');
+  showEst();
+}
+try{const v=JSON.parse(localStorage.getItem(tuneKey));if(v)['rGap','rTimeout','rRate'].forEach(k=>{if(Number.isFinite(+v[k]))$(k).value=v[k]})}catch{}
+['rGap','rTimeout','rRate'].forEach(k=>$(k).addEventListener('input',()=>{
+  showTune();
+  try{localStorage.setItem(tuneKey,JSON.stringify({rGap:$('rGap').value,rTimeout:$('rTimeout').value,rRate:$('rRate').value}))}catch{}
+  api.tuneHunt(tune());
+}));
+api.onProgress(st=>{prog=st;$('prog').textContent=t('huntProg',st);live(st)}); // not render(): it rebuilds the journal and scrolls it down
+const openF=async k=>{const r=await api.openFile(k);if(r&&r.error)accErr(r)};
+$('openIds').onclick=()=>openF('ids');
+// update check: GitHub's latest release against this version; a newer one opens its page (the user downloads the exe), nothing is replaced by itself
+let appVer='';
+async function checkUpd(manual){
+  const r=await api.updateCheck();
+  if(r.error){if(manual)push('updFail',{},'bad',r.error.msg);return}
+  const v=r.result;
+  if(v.none){if(manual)push('updNone');return}
+  if(v.newer){push('updNew',{v:v.tag});if(manual)api.openLink('update')}
+  else if(manual)push('updLatest',{v:v.tag});
+}
+$('upd').onclick=()=>checkUpd(true);
+$('updAuto').checked=(()=>{try{return localStorage.getItem('updAuto')!=='0'}catch{return true}})();
+$('updAuto').onchange=e=>{try{localStorage.setItem('updAuto',e.target.checked?'1':'0')}catch{}};
+api.appInfo().then(i=>{appVer=i.version;render();if($('updAuto').checked)checkUpd(false)});
+$('gh').onclick=async()=>{const r=await api.openLink('github');if(r&&r.error)accErr(r)};
+$('openFound').onclick=()=>openF('found');
+$('openClaimed').onclick=()=>openF('claimed');
+// the search takes one request per ID, so the time is about count x pause; the pause is adaptive and grows after a 429, so this is the best case
+let idCount=null; // {n, bad} after "Count IDs"
+const dur=s=>{s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+' '+t('unitH')+' '+m+' '+t('unitM'):m?m+' '+t('unitM')+' '+s%60+' '+t('unit'):s+' '+t('unit')};
+function showEst(){
+  const s=accs.filter(a=>a.use).length,n=accs.filter(a=>a.use&&!a.id).length; // an account that already has an ID is not used by the search
+  $('hSel').textContent=accs.length?t(n<s?'hSelSkip':'hSel',{n:n<s?n:s,s,m:accs.length}):'';
+  const c=$('hCount'),tm=$('hTime');
+  c.textContent=idCount?(idCount.n?t('hCount',{n:idCount.n}):t('hNone'))+(idCount.bad?', '+t('hBad',{n:idCount.bad}):''):'';
+  const g=$('rGap').value/10,fast=g<5;
+  tm.textContent=idCount&&idCount.n?t(fast?'hTime429':'hTime',{g:g.toFixed(1)+' '+t('unit'),d:dur(idCount.n*g)}):'';
+  tm.className=fast?'e':'';
+}
+$('count').onclick=async()=>{const r=await api.countIds();if(r.error)return accErr(r);idCount=r.result;showEst()};
+$('dir').onclick=()=>api.openDir();
+$('hunt').onclick=async()=>{
+  if(hunting){api.stopHunt();return}
+  const sel=accs.filter(a=>a.use&&!a.id),man=sel.filter(a=>a.guard&&!a.secret).length;
+  if(!confirm([t('huntConfirm',{n:sel.length}),man&&t('huntManual',{n:man})].filter(Boolean).join('\n')))return;
+  reset();prog=null;hunting=true;lock(true);render();
+  const r=await api.hunt(tune());
+  hunting=false;lock(false);
+  if(r&&r.error)fail(r);
+  render();
+  loadAccs(); // a claim gives the account its ID
+};
+
+// account manager: the list comes without passwords, ticks decide who takes part in the next search
+// column sorting: first click ascending, second descending, third back to the file order; empty values stay last
+const sort={k:'',d:1};
+const SORT={login:a=>a.login.toLowerCase(),steamId:a=>a.steamId,id:a=>a.id.toLowerCase()};
+let V=[]; // the accounts in the order shown: ticks and Shift ranges follow what the user sees
+const view=()=>{if(!sort.k)return accs;const f=SORT[sort.k];return [...accs].sort((a,b)=>{const x=f(a),y=f(b);if(!x!==!y)return x?-1:1;return sort.d*x.localeCompare(y,undefined,{numeric:true})})};
+function th(k,key){
+  const b=Object.assign(document.createElement('button'),{className:'s',textContent:t(key)+(sort.k===k?(sort.d>0?' ↑':' ↓'):'')});
+  b.onclick=()=>{if(sort.k!==k){sort.k=k;sort.d=1}else if(sort.d>0)sort.d=-1;else sort.k='';anchor=-1;renderAcc()};
+  const c=document.createElement('div');c.append(b);c.setAttribute('aria-sort',sort.k===k?(sort.d>0?'ascending':'descending'):'none');return c;
+}
+function renderAcc(){
+  V=view();
+  const box=$('mList'),keep=box.scrollTop;box.textContent='';
+  const div=(c,x)=>Object.assign(document.createElement('div'),{className:c,textContent:x??''});
+  if(!accs.length)box.append(div('ar none',t('mgrEmpty')));
+  else{
+    const h=div('ar h');h.append(div(''),th('login','login'),th('steamId','mgrSteamId'),th('id','mgrId'),div(''));box.append(h);
+    for(const [i,a] of V.entries()){
+      const r=div('ar'),cb=document.createElement('input');
+      cb.type='checkbox';cb.checked=a.use;cb.disabled=busy;cb.setAttribute('aria-label',a.login);
+      cb.onclick=e=>pick(i,e,cb.checked);
+      // click on the row shows the password, Shift+click ticks a range like in a file manager
+      r.onclick=e=>{if(e.target.closest('button,input'))return;if(e.shiftKey){getSelection().removeAllRanges();if(!busy)pick(i,e,!a.use)}else toggleShow(a)};
+      const who=div('t',a.login),note=document.createElement('small');
+      note.textContent=a.err||(a.secret?t('mgrSecret'):a.guard?t('mgrManual'):'');
+      if(a.err)note.className='e';
+      who.append(note);
+      const clr=Object.assign(document.createElement('button'),{className:'btn sec sm',textContent:t('mgrClear'),disabled:busy||!a.id});
+      clr.onclick=()=>clearOne(a);
+      const del=Object.assign(document.createElement('button'),{className:'btn sec sm',textContent:t('mgrRemove'),disabled:busy});
+      del.onclick=()=>removeOne(a);
+      const act=div('btns');act.append(clr,del);
+      r.append(cb,who,div('t m',a.steamId||'—'),div('t m',a.id?'/id/'+a.id:'—'),act);
+      box.append(r);
+      const s=shown.get(a.login);
+      if(s){
+        const d=div('ar d'),txt=div('x',t('mgrPw')+': '+s.password+(s.secret?'   shared_secret: '+s.secret:''));
+        const copy=(key,what)=>{const b=Object.assign(document.createElement('button'),{className:'btn sec sm',textContent:t(key)});
+          b.onclick=async()=>{const r=await api.accCopy(a.login,what);if(r.error)return accErr(r);b.textContent=t('mgrCopied');setTimeout(()=>{b.textContent=t(key)},1500)};return b};
+        d.append(txt,copy('mgrCopyLogin','login'),copy('mgrCopyPw','password'));box.append(d);
+      }
+    }
+  }
+  box.scrollTop=keep;
+  $('mSel').textContent=accs.length?t('mgrSel',{n:accs.filter(a=>a.use).length,m:accs.length}):'';
+  ['mAll','mNone','mNoId','mAddBtn','mAddFile'].forEach(id=>$(id).disabled=busy);
+  syncCfg();showEst();
+  $('mRefresh').disabled=refreshing?false:busy||!accs.some(a=>a.use);
+}
+const shown=new Map(); // login -> {password, secret}: fetched only when the user clicks the account
+const syncCfg=()=>['mImport','mFile','mExport'].forEach(id=>$(id).disabled=busy||!$('mPass').value); // the config buttons need the password first
+$('mPass').addEventListener('input',syncCfg);
+let anchor=-1; // the last ticked row, where a Shift range starts
+const accErr=r=>r.error.key?push(r.error.key,r.error.p||{},'bad'):push('err',{},'bad',r.error.msg);
+async function pick(i,e,on){
+  const from=e.shiftKey&&anchor>=0?Math.min(anchor,i):i,to=e.shiftKey&&anchor>=0?Math.max(anchor,i):i;
+  anchor=i;
+  await api.accUse(V.slice(from,to+1).map(a=>a.login),on);
+  loadAccs();
+}
+async function toggleShow(a){
+  if(shown.has(a.login))shown.delete(a.login);
+  else{const r=await api.accReveal(a.login);if(r.error)return accErr(r);shown.set(a.login,r.result)}
+  renderAcc();
+}
+async function loadAccs(){
+  const r=await api.accList();
+  if(r.error)accErr(r);else accs=r.result;
+  renderAcc();
+}
+async function clearOne(a){
+  if(!confirm(t('mgrClearConfirm',{id:a.id,login:a.login})))return;
+  reset();lock(true);render();
+  const r=await api.accClear({login:a.login,id:a.id});
+  lock(false);
+  if(r&&r.error)fail(r);
+  render();loadAccs();
+}
+async function removeOne(a){
+  if(!confirm(t('mgrRemoveConfirm',{login:a.login})))return;
+  const r=await api.accRemove([a.login]);
+  if(r.error)accErr(r);
+  shown.delete(a.login);
+  loadAccs();
+}
+$('mAll').onclick=async()=>{await api.accUse(null,true);loadAccs()};
+$('mNoId').onclick=async()=>{ // exactly the accounts that own no custom ID; the search would skip the others anyway
+  await api.accUse(accs.filter(a=>a.id).map(a=>a.login),false);
+  await api.accUse(accs.filter(a=>!a.id).map(a=>a.login),true);
+  loadAccs();
+};
+$('mNone').onclick=async()=>{await api.accUse(null,false);loadAccs()};
+$('mAddBtn').onclick=async()=>{
+  const r=await api.accAdd($('mAdd').value);
+  if(r.error)return accErr(r);
+  shown.clear(); // a known login may have got a new password
+  if(!r.result.bad)$('mAdd').value=''; // lines that were not understood stay, so nothing has to be typed again
+  push('mgrAdded',r.result,'ok');
+  if(r.result.bad)push('badAccounts',{n:r.result.bad},'bad');
+  loadAccs();
+};
+$('mAddFile').onclick=async()=>{
+  const r=await api.accAddFile();
+  if(r.error)return accErr(r);
+  if(!r.result)return; // the dialog was cancelled
+  shown.clear();
+  push('mgrAdded',r.result,'ok');
+  if(r.result.bad)push('badAccounts',{n:r.result.bad},'bad');
+  loadAccs();
+};
+$('mImport').onclick=async()=>{
+  const r=await api.accImport($('mAdd').value,$('mPass').value);
+  if(r.error)return accErr(r);
+  shown.clear();$('mAdd').value='';
+  push('mgrAdded',r.result,'ok');
+  loadAccs();
+};
+$('mFile').onclick=async()=>{
+  const r=await api.accImportFile($('mPass').value);
+  if(r.error)return accErr(r);
+  if(!r.result)return; // the dialog was cancelled
+  shown.clear();
+  push('mgrAdded',r.result,'ok');
+  loadAccs();
+};
+$('mExport').onclick=async()=>{
+  const r=await api.accExport($('mPass').value);
+  if(r.error)return accErr(r);
+  if(r.result)push('mgrExported',{file:r.result},'ok'); // an empty result: the user cancelled the dialog
+};
+$('mRefresh').onclick=async()=>{
+  if(refreshing){api.stopHunt();return}
+  reset();refreshing=true;lock(true);render();
+  const r=await api.accRefresh();
+  refreshing=false;lock(false);
+  if(r&&r.error)fail(r);
+  render();loadAccs();
+};
+render();
+loadAccs();
+</script></body></html>
