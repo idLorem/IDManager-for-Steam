@@ -38,7 +38,7 @@ ipcMain.handle('acc-copy', (_e, { login, what }) => {
 });
 
 // Where the project lives. Put the address here once it is published (https://github.com/<user>/<repo>); until then the two buttons only say that it is not set.
-const REPO = 'https://github.com/idLorem/SteamIDManager';
+const REPO = 'https://github.com/idLorem/IDManager-for-Steam';
 const LINKS = { github: REPO, update: REPO && REPO + '/releases/latest' };
 // true when version a is newer than b (v1.2.3 style, numbers only)
 const newer = (a, b) => {
@@ -51,7 +51,7 @@ ipcMain.handle('app-info', () => ({ version: app.getVersion() }));
 ipcMain.handle('update-check', async () => {
   try {
     if (!REPO) return { error: { key: 'noLink' } };
-    const r = await fetch(REPO.replace('github.com/', 'api.github.com/repos/') + '/releases/latest', { headers: { 'User-Agent': 'SteamIDManager', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000) });
+    const r = await fetch(REPO.replace('github.com/', 'api.github.com/repos/') + '/releases/latest', { headers: { 'User-Agent': 'IDManager-for-Steam', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000) });
     if (r.status === 404) return { ok: true, result: { none: true } }; // no release published yet
     if (!r.ok) throw new Error('GitHub answered ' + r.status);
     const tag = String((await r.json()).tag_name || '');
@@ -105,7 +105,7 @@ ipcMain.handle('acc-import', quick(({ text, password }) => acc.importText(dir, t
 ipcMain.handle('acc-export', async (_e, password) => {
   try {
     const text = acc.exportText(dir, password);
-    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(dir, 'vanityswap-accounts.vsa'), filters: [{ name: 'VanitySwap', extensions: ['vsa'] }] });
+    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(dir, 'idmanager-accounts.vsa'), filters: [{ name: 'IDManager', extensions: ['vsa'] }] });
     if (r.canceled || !r.filePath) return { ok: true, result: '' };
     fs.writeFileSync(r.filePath, text, 'utf8');
     return { ok: true, result: r.filePath };
@@ -114,7 +114,7 @@ ipcMain.handle('acc-export', async (_e, password) => {
 // import: the user picks the .vsa file in the system dialog; nothing happens if the dialog is cancelled
 ipcMain.handle('acc-import-file', async (_e, password) => {
   try {
-    const r = await dialog.showOpenDialog(win, { defaultPath: dir, properties: ['openFile'], filters: [{ name: 'VanitySwap', extensions: ['vsa', 'txt'] }, { name: '*', extensions: ['*'] }] });
+    const r = await dialog.showOpenDialog(win, { defaultPath: dir, properties: ['openFile'], filters: [{ name: 'IDManager', extensions: ['vsa', 'txt'] }, { name: '*', extensions: ['*'] }] });
     if (r.canceled || !r.filePaths[0]) return { ok: true, result: null };
     if (fs.statSync(r.filePaths[0]).size > 1e6) throw Object.assign(new Error('badConfig'), { key: 'badConfig' }); // a config is a few KB, never read a huge file
     return { ok: true, result: acc.importText(dir, fs.readFileSync(r.filePaths[0], 'utf8'), password) };

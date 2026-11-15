@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'unsafe-inline'">
-<title>SteamIDManager</title>
+<title>IDManager for Steam</title>
 <style>
 :root{
   color-scheme:dark;
@@ -226,7 +226,7 @@ textarea:hover{border-color:var(--line2)}textarea:focus-visible{outline:2px soli
 
 <script>
 const I={
-ru:{title:'SteamIDManager',swapTitle:'Swapper',acc:'Аккаунт',cap1:'Сейчас владеет ID',cap2:'Получит ID',login:'Логин',password:'Пароль',
+ru:{title:'IDManager for Steam',swapTitle:'Swapper',acc:'Аккаунт',cap1:'Сейчас владеет ID',cap2:'Получит ID',login:'Логин',password:'Пароль',
   secretHint:'Необязательно. Для автоматических кодов Steam Guard',idTitle:'ID профиля',idMove:'Перейдёт ко 2-му аккаунту:',moveAuto:'текущий ID аккаунта 1, он определится при обмене',
   idTemp:'Временный ID для аккаунта 1',idTempHint:'Если пусто, будет случайный',run:'Выполнить обмен',running:'Выполняется…',
   privacy:'Пароли аккаунтов 1 и 2 хранятся только в памяти и нигде не сохраняются',guardTitle:'Код Steam Guard',guardApp:'Аккаунт {n}: код из приложения Steam Guard',
@@ -270,7 +270,7 @@ ru:{title:'SteamIDManager',swapTitle:'Swapper',acc:'Аккаунт',cap1:'Сей
   mgrPw:'пароль',mgrImport:'Импорт из текста',mgrFile:'Выбрать файл конфига',mgrExport:'Скачать конфиг',mgrCfgTitle:'Перенос аккаунтов',mgrPassLabel:'Пароль конфига',
   mgrPassHint:'Им шифруется скачиваемый файл (от 5 символов, с цифрой и заглавной буквой), тот же пароль нужен при импорте. Для импорта введите пароль и выберите файл .vsa, либо вставьте его текст в поле «Добавить аккаунты» выше',
   mgrExported:'Конфиг сохранён: {file}',passWeak:'Пароль конфига: минимум 5 символов, с цифрой и заглавной буквой',huntSkipId:'Пропущено аккаунтов, у которых уже есть ID: {n} (нажмите «Проверить выбранные» в менеджере, чтобы обновить данные)',huntLoginLimit:'Steam ограничил частоту входов или запросов: аккаунты пока не берутся, при следующей находке попробую снова',upd:'Обновление',gh:'GitHub',help:'Помощь',close:'Закрыть',updAuto:'Проверять обновления при запуске',updNew:'Доступна новая версия {v}: нажмите «Обновление», чтобы скачать',updLatest:'У вас последняя версия ({v})',updNone:'Релизов на GitHub пока нет',updFail:'Не удалось проверить обновления',verText:'Версия {v}',noLink:'Ссылка на GitHub ещё не задана в программе',noAccounts:'Нет аккаунтов для экспорта',
-  badConfig:'Это не конфиг VanitySwap: текст должен начинаться с VSA1.',badPass:'Неверный пароль или файл повреждён',
+  badConfig:'Это не конфиг IDManager for Steam: текст должен начинаться с VSA1.',badPass:'Неверный пароль или файл повреждён',
   mgrAddLabel:'Добавить аккаунты',mgrAddHint:'По одному в строке: логин:пароль или логин:пароль:shared_secret (тогда коды Steam Guard вводятся сами). Известный логин получит новый пароль',mgrAdd:'Добавить',
   mgrEmpty:'Аккаунтов пока нет, добавьте их ниже',mgrSteamId:'SteamID64',mgrId:'Свой ID',mgrClear:'Очистить ID',mgrRemove:'Удалить',
   mgrClearConfirm:'Полностью удалить ID /id/{id} у аккаунта {login}? Профиль останется только по номеру, а ID сможет занять кто угодно: вернуть его может не получиться.',
@@ -284,7 +284,7 @@ ru:{title:'SteamIDManager',swapTitle:'Swapper',acc:'Аккаунт',cap1:'Сей
   clearKept:'Аккаунт {login}: Steam принял запрос, но ID «{id}» остался. Так его не очистить, смените ID вручную на сайте steamcommunity.com',
   accMissing:'Аккаунта {login} нет в accounts.txt',
   huntDone:'Готово: проверено {checked} из {total}, свободных {found}, занято {claimed}',huntStopped:'Остановлено: проверено {checked} из {total}, свободных {found}, занято {claimed}'},
-en:{title:'SteamIDManager',swapTitle:'Swapper',acc:'Account',cap1:'Owns the ID now',cap2:'Receives the ID',login:'Login',password:'Password',
+en:{title:'IDManager for Steam',swapTitle:'Swapper',acc:'Account',cap1:'Owns the ID now',cap2:'Receives the ID',login:'Login',password:'Password',
   secretHint:'Optional. Generates Steam Guard codes automatically',idTitle:'Profile ID',idMove:'Will move to account 2:',moveAuto:'account 1’s current ID, read at swap time',
   idTemp:'Temporary ID for account 1',idTempHint:'Random if left empty',run:'Run swap',running:'Running…',
   privacy:'Passwords of accounts 1 and 2 stay in memory and are never saved',guardTitle:'Steam Guard code',guardApp:'Account {n}: code from the Steam Guard app',
@@ -328,7 +328,7 @@ en:{title:'SteamIDManager',swapTitle:'Swapper',acc:'Account',cap1:'Owns the ID n
   mgrPw:'password',mgrImport:'Import from text',mgrFile:'Choose config file',mgrExport:'Download config',mgrCfgTitle:'Move accounts',mgrPassLabel:'Config password',
   mgrPassHint:'It encrypts the downloaded file (at least 5 characters, with a digit and a capital letter); the same password is needed to import it. To import, enter the password and choose the .vsa file, or paste its text into “Add accounts” above',
   mgrExported:'Config saved: {file}',passWeak:'Config password: at least 5 characters, with a digit and a capital letter',huntSkipId:'Skipped accounts that already have an ID: {n} (press Check selected in the manager to refresh what is known)',huntLoginLimit:'Steam limited sign-ins or requests: accounts are not taken for now, I will try again on the next find',upd:'Update',gh:'GitHub',help:'Help',close:'Close',updAuto:'Check for updates on start',updNew:'New version {v} is available: press Update to download it',updLatest:'You have the latest version ({v})',updNone:'No releases on GitHub yet',updFail:'Could not check for updates',verText:'Version {v}',noLink:'The GitHub link is not set in the program yet',noAccounts:'No accounts to export',
-  badConfig:'This is not a VanitySwap config: the text must start with VSA1.',badPass:'Wrong password or the file is damaged',
+  badConfig:'This is not an IDManager for Steam config: the text must start with VSA1.',badPass:'Wrong password or the file is damaged',
   mgrAddLabel:'Add accounts',mgrAddHint:'One per line: login:password or login:password:shared_secret (then Steam Guard codes are entered automatically). A known login gets the new password',mgrAdd:'Add',
   mgrEmpty:'No accounts yet, add them below',mgrSteamId:'SteamID64',mgrId:'Custom ID',mgrClear:'Clear ID',mgrRemove:'Delete',
   mgrClearConfirm:'Remove the ID /id/{id} of account {login} completely? The profile will be reachable only by its number and anyone could take the ID: getting it back may not be possible.',
