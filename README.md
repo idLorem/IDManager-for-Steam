@@ -62,7 +62,7 @@ MIT, see [LICENSE](LICENSE).
 
 <a id="ru"></a>
 
-# IDManager for Steam (по-русски)
+# IDManager for Steam
 
 [English](#idmanager-for-steam) · [Русский](#ru)
 

@@ -13,7 +13,7 @@ let win;
 app.whenReady().then(() => {
   win = new BrowserWindow({
     width: 960, height: 900, minWidth: 720, minHeight: 640,
-    autoHideMenuBar: true, backgroundColor: '#0f1318', icon: path.join(__dirname, 'build', 'icon.png'),
+    autoHideMenuBar: true, backgroundColor: '#0b0b0c', icon: path.join(__dirname, 'build', 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js') },
   });
   win.loadFile('index.html');
