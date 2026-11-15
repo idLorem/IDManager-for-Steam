@@ -1,6 +1,6 @@
 {
   "name": "vanity-swap",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Swap, manage and hunt Steam custom profile IDs",
   "private": true,
   "main": "main.js",
@@ -13,7 +13,10 @@
     "appId": "local.vanityswap",
     "productName": "SteamIDManager",
     "compression": "maximum",
-    "electronLanguages": ["en-US", "ru"],
+    "electronLanguages": [
+      "en-US",
+      "ru"
+    ],
     "files": [
       "main.js",
       "preload.js",
