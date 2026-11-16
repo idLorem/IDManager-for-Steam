@@ -1,3 +1,4 @@
+const http = require('http');
 const https = require('https');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { HttpsProxyAgent } = require('https-proxy-agent');
@@ -27,7 +28,7 @@ const useOn = (community) => { if (live() && community.request) community.reques
 // A small fetch for the ID search through the proxy (Node's own fetch cannot use SOCKS). Same shape as fetch for what the search reads.
 function fetchVia(u, { headers, signal } = {}, hops = 0) {
   return new Promise((resolve, reject) => {
-    const req = https.get(u, { agent: agent || undefined, headers, signal }, (res) => {
+    const req = (/^http:/i.test(u) ? http : https).get(u, { agent: agent || undefined, headers, signal }, (res) => {
       const loc = res.headers.location;
       if ([301, 302, 303, 307, 308].includes(res.statusCode) && loc && hops < 3) { res.resume(); return resolve(fetchVia(new URL(loc, u).href, { headers, signal }, hops + 1)); }
       const chunks = [];

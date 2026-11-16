@@ -665,5 +665,36 @@ const cfg = { a1: { login: 'a', password: 'b' }, a2: { login: 'c', password: 'd'
   assert.strictEqual(px.live(), true); // down is reset at the end of the run
   px.set(''); Object.assign(hunt.timing, { netFails: 5, proxyProbe: 5 * 60 * 1000 });
   fs.rmSync(dirP, { recursive: true, force: true });
+
+  // the position is saved while the search runs (every 50 IDs), not only on Stop
+  const dirS = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-'));
+  fs.writeFileSync(path.join(dirS, 'ids.txt'), Array.from({ length: 60 }, (_, i) => 'Z' + String(i).padStart(3, '0')).join(','));
+  fs.writeFileSync(path.join(dirS, 'accounts.txt'), '# none\n');
+  let nFetch = 0, snap = null;
+  await hunt.runHunt({}, { log: () => {}, dir: dirS }, L, {
+    fetch: async () => { if (++nFetch === 53) snap = fs.readFileSync(path.join(dirS, 'hunt-progress.json'), 'utf8'); return { status: 200, headers: { get: () => null }, text: async () => '<div class="profile_header"></div>' }; },
+  });
+  assert.deepStrictEqual(JSON.parse(snap), { id: 'Z049' });
+  assert.strictEqual(fs.existsSync(path.join(dirS, 'hunt-progress.json')), false); // finished: forgotten
+  fs.rmSync(dirS, { recursive: true, force: true });
+
+  // the search request through a proxy: tunnel, redirect, headers, status
+  const net = require('net'), http = require('http');
+  const target = http.createServer((q, r) => {
+    if (q.url === '/a') { r.writeHead(302, { location: '/b' }); return r.end(); }
+    r.writeHead(200, { 'x-t': '1' }); r.end('hello ' + q.headers['x-in']);
+  });
+  await new Promise((ok) => target.listen(0, '127.0.0.1', ok));
+  const tunneled = [];
+  const gate = http.createServer();
+  gate.on('connect', (q, sock) => { tunneled.push(q.url); const s = net.connect(target.address().port, '127.0.0.1', () => { sock.write('HTTP/1.1 200 OK\r\n\r\n'); s.pipe(sock); sock.pipe(s); }); s.on('error', () => sock.destroy()); sock.on('error', () => s.destroy()); });
+  await new Promise((ok) => gate.listen(0, '127.0.0.1', ok));
+  px.set('http://127.0.0.1:' + gate.address().port);
+  const via = await px.search('http://127.0.0.1:' + target.address().port + '/a', { headers: { 'x-in': 'in' } });
+  assert.strictEqual(via.status, 200);
+  assert.strictEqual(await via.text(), 'hello in');
+  assert.strictEqual(via.headers.get('X-T'), '1');
+  assert.ok(tunneled.length >= 1); // went through the proxy (a kept-alive tunnel serves the redirect too)
+  px.set(''); gate.close(); target.close(); gate.closeAllConnections(); target.closeAllConnections();
   console.log('ok');
 })().catch((e) => { console.error(e); process.exit(1); });

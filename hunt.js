@@ -162,6 +162,7 @@ async function runHunt(cfg, { log, progress = () => {}, dir, askCode = noGuard }
       if (r === 'stopped') break;
       if (r === 'unknown' && !again.has(id)) { again.add(id); queue2.push(id); continue; }
       st.checked++;
+      if (st.checked % 50 === 0 && !again.has(id)) try { fs.writeFileSync(f('resume'), JSON.stringify({ id })); } catch {} // a crash or a closed window keeps the place too
       if (r === 'unknown') log('huntUnknown', { id });
       if (r === 'available') {
         st.found++;
