@@ -1,6 +1,6 @@
 {
   "name": "vanity-swap",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Swap, manage and hunt Steam custom profile IDs",
   "private": true,
   "license": "MIT",

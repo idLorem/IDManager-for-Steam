@@ -9,12 +9,15 @@ const acc = require('./accounts');
 // The portable exe unpacks itself to a temp folder, so the files go next to the exe it was started from.
 const dir = process.env.PORTABLE_EXECUTABLE_DIR || (app.isPackaged ? path.dirname(process.execPath) : __dirname);
 
+// a covered window or a locked remote session must not make Chromium stop drawing: a long search keeps updating the journal
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 let win;
 app.whenReady().then(() => {
   win = new BrowserWindow({
     width: 960, height: 900, minWidth: 720, minHeight: 640,
     autoHideMenuBar: true, backgroundColor: '#0b0b0c', icon: path.join(__dirname, 'build', 'icon.png'),
-    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false }, // a long search must keep drawing when the window is covered or the remote session is locked
   });
   win.loadFile('index.html');
   try { initFiles(dir); } catch {} // ids.txt, available.txt and accounts.txt are made on start; existing ones stay as they are (e.g. a read-only folder just skips this)
@@ -83,11 +86,18 @@ const op = (fn, needAccounts = true) => async (_e, cfg) => {
 
 // an account the program changed is unticked and marked in the manager: what is known about it is out of date
 const changed = (...logins) => { try { const known = acc.loadAccounts(dir).accounts.map((x) => x.login); for (const l of logins) if (known.includes(l)) acc.patch(dir, l, { use: false, stale: true }); } catch {} }; // only accounts of the manager (a login typed by hand is not in the list)
-const afterSwap = (run) => async (cfg, io) => { const r = await run(cfg, io); changed(cfg.a1.login, cfg.a2.login); return r; };
+// marked once the checks passed, success or not: from then on the swap may have changed either account
+const afterSwap = (run) => async (cfg, io) => {
+  let went = false;
+  try { return await run(cfg, { ...io, log: (k, p) => { if (k === 'ready') went = true; io.log(k, p); } }); } finally { if (went) changed(cfg.a1.login, cfg.a2.login); }
+};
 ipcMain.handle('start', op(afterSwap(runSwap)));
 // everything the fast swap logs goes to a file next to the exe as well, with the final result
-const fastFile = (line) => { try { fs.appendFileSync(path.join(dir, 'fastswap-log.txt'), new Date().toISOString() + ' ' + line + '\n'); } catch {} };
+let fastRun = []; // the lines of the last fast swap, for the Log button
+const fastFile = (line) => { const l = new Date().toISOString() + ' ' + line; fastRun.push(l); try { fs.appendFileSync(path.join(dir, 'fastswap-log.txt'), l + '\n'); } catch {} };
+ipcMain.handle('fast-log', () => fastRun.join('\n'));
 ipcMain.handle('start-fast', op(afterSwap(async (cfg, io) => {
+  fastRun = [];
   fastFile('--- fast swap, offset ' + cfg.offset + ' ms');
   try {
     const r = await runFastSwap(cfg, { ...io, log: (k, p) => { fastFile(k === 'fastLog' ? p.m : k + ' ' + JSON.stringify(p || {})); io.log(k, p); } });
@@ -144,7 +154,7 @@ ipcMain.handle('acc-add-file', async () => {
   } catch (e) { return failure(e); }
 });
 // only the accounts ticked in the manager are checked
-ipcMain.handle('acc-refresh', op((_cfg, io) => acc.refresh(dir, acc.selected(dir), io), false));
+ipcMain.handle('acc-refresh', op((_cfg, io) => acc.refresh(dir, acc.toCheck(dir), io), false));
 ipcMain.handle('acc-clear', op((cfg, io) => acc.clearId(dir, cfg, io), false));
 ipcMain.on('hunt-tune', (_e, cfg) => tune(cfg)); // slider changes during a search
 ipcMain.handle('files-open', () => shell.openPath(dir));

@@ -13,7 +13,8 @@ Object.assign(timing, { gap: 1, settle: 1, wait: 1, rateWait: 1 }); // no real w
 const posts = [];
 let failTarget = 0, logins = 0, gets = 0, noProfile = false, rate = 0, noLang = 0, emptyName = false;
 const pws = {}, owned = {}, postBy = []; // owned: IDs an account got on the fake Steam
-let quirk = false, track = false; // track: a successful change really moves the ID on the fake Steam (only the tests that read the page afterwards need it)
+let quirk = false, track = false, ghost = false; // ghost: Steam answers success to a rollback but the profile does not change
+ // track: a successful change really moves the ID on the fake Steam (only the tests that read the page afterwards need it)
 let lost = ''; // an ID whose claim goes through on the fake Steam but the answer is lost
 const uris = [];
 const limited = new Set(), guardFirst = new Set(), keep = new Set(), codes = []; // logins Steam rate-limits / asks a code from / ignores an ID clear for
@@ -55,6 +56,7 @@ class C {
       owned[this.acct] = '';
       if (quirk) return cb(null, { statusCode: 200 }, JSON.stringify({ success: 2, errmsg: 'An error occurred while setting account details<br />' })); // seen on the real Steam: an error although the ID is gone
     }
+    if (ghost && url === 'cool' && this.acct === 'a') { owned.a = 'zz'; return cb(null, { statusCode: 200 }, JSON.stringify({ success: 1 })); }
     if (lost && url === lost) { owned[this.acct] = url; return cb(null, { statusCode: 500 }, ''); }
     const bad = url === 'cool' && failTarget-- > 0;
     if (track && !bad) owned[this.acct] = url;
@@ -83,7 +85,7 @@ const cfg = { a1: { login: 'a', password: 'b' }, a2: { login: 'c', password: 'd'
   assert.deepStrictEqual(ids, { 1: 'cool', 2: '' });
   assert.strictEqual(logins, 6);
   const g = gets;
-  assert.strictEqual(g, 6); // loading IDs makes no web requests (4 checks of two swaps + the 2 profile reads after the failed change)
+  assert.strictEqual(g, 7); // loading IDs makes no web requests (4 checks of two swaps + the 2 profile reads after the failed change + 1 to confirm the rollback)
   await runSwap(cfg, io, L); // reuses the sessions from loadIds but still checks fresh
   assert.strictEqual(logins, 6);
   assert.strictEqual(gets, g + 2);
@@ -148,9 +150,30 @@ const cfg = { a1: { login: 'a', password: 'b' }, a2: { login: 'c', password: 'd'
   assert(/offset 30 ms/.test(fl));
   swapTiming.fastOffset = 1;
   assert(/POST 1 answered at \d+ ms: ok, reply \{"success":1\}/.test(fl)); // the raw reply is logged
-  assert(/profile of account 1 read after POST 1 answered/.test(fl)); // the side read of account 1
+  assert(!/profile of account 1 read/.test(fl)); // no side reads: they only add load while the ID is moving
   await assert.rejects(runFastSwap({ ...fcfg, temp: 'x' }, io, L), (e) => e.key === 'badTemp'); // checked before anything changes
   assert.deepStrictEqual(posts.splice(0), []);
+  logs.length = 0; ghost = true; failTarget = 3; track = true; // the rollback is answered with success but the profile never shows the ID: it must be reported, not trusted
+  await assert.rejects(runSwap(cfg, io, L), /taken/);
+  assert(logs.some(([k]) => k === 'rollbackFail') && !logs.some(([k]) => k === 'rollback'));
+  ghost = false; track = false; failTarget = 0; delete owned.a; delete owned.c; posts.length = 0;
+
+  // take the old ID of account 2: the very last step, only logged when it fails
+  logs.length = 0; track = true; owned.c = 'oldc'; delete owned.a;
+  await runSwap({ ...cfg, takeOld: true }, io, L);
+  assert.deepStrictEqual(posts.splice(0), ['tmp1', 'cool', 'oldc']);
+  assert(logs.some(([k, p]) => k === 'taken' && p.id === 'oldc'));
+  logs.length = 0; owned.c = 'oldc'; delete owned.a;
+  await runFastSwap({ ...fcfg, takeOld: true }, io, L);
+  assert.deepStrictEqual(posts.splice(0), ['tmp9', 'cool', 'oldc']);
+  logs.length = 0; owned.c = ''; delete owned.a;
+  await runSwap({ ...cfg, takeOld: true }, io, L); // account 2 had no ID: nothing to take
+  assert.deepStrictEqual(posts.splice(0), ['tmp1', 'cool']);
+  assert(logs.some(([k]) => k === 'takeNone'));
+  logs.length = 0; owned.c = 'oldc'; delete owned.a; track = false;
+  await runSwap({ ...cfg, takeOld: true }, io, L); // the profile never shows it: reported, the swap itself stays a success
+  assert(logs.some(([k]) => k === 'takeFail') && logs.some(([k]) => k === 'done'));
+  posts.length = 0; delete owned.a; delete owned.c;
 
   // Steam Guard prompts: one at a time, and a timeout does not block the next one
   const bus = new EventEmitter(), asked = [];
@@ -473,6 +496,13 @@ const cfg = { a1: { login: 'a', password: 'b' }, a2: { login: 'c', password: 'd'
   assert.deepStrictEqual(acc.selected(dirM), ['m1', 'm3']);
   acc.setUse(dirM, null, true);
   assert.strictEqual(acc.selected(dirM).length, 3);
+  acc.patch(dirM, 'm2', { use: false, stale: true }); // marked as changed: cannot be ticked by anything, only the check takes it
+  acc.setUse(dirM, null, true); acc.setUse(dirM, ['m2'], true);
+  assert.deepStrictEqual(acc.selected(dirM), ['m1', 'm3']);
+  assert.deepStrictEqual(acc.toCheck(dirM), ['m1', 'm3', 'm2'].sort((a, b) => a.localeCompare(b)));
+  assert.strictEqual(acc.list(dirM).find((a) => a.login === 'm2').use, false);
+  acc.patch(dirM, 'm2', { stale: false });
+  acc.setUse(dirM, null, true);
 
   // check: SteamID64 and custom ID are stored; a login rate limit stops the whole batch
   hlogs.length = 0; owned.m1 = 'OwnedOne';

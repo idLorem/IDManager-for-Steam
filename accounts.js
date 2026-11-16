@@ -60,7 +60,8 @@ function list(dir) {
     return { login, secret: !!secret, use: m.use !== false, steamId: m.steamId || '', id: m.id || '', guard: !!m.guard, err: m.err || '', stale: !!m.stale };
   });
 }
-const selected = (dir) => list(dir).filter((a) => a.use).map((a) => a.login);
+const selected = (dir) => list(dir).filter((a) => a.use && !a.stale).map((a) => a.login);
+const toCheck = (dir) => list(dir).filter((a) => a.use || a.stale).map((a) => a.login); // an account that needs a check can only be selected by the check itself
 
 // Adds accounts from pasted text. A known login gets its password (and secret) replaced.
 function add(dir, text) {
@@ -97,7 +98,7 @@ function remove(dir, logins) {
 // logins: which accounts, or null for all
 function setUse(dir, logins, use) {
   const info = readInfo(dir);
-  for (const { login } of loadAccounts(dir).accounts) if (!logins || logins.includes(login)) info[login] = { ...info[login], use: !!use };
+  for (const { login } of loadAccounts(dir).accounts) if ((!logins || logins.includes(login)) && !(use && info[login] && info[login].stale)) info[login] = { ...info[login], use: !!use }; // a marked account stays unticked until it is checked
   writeAtomic(path.join(dir, FILES.info), JSON.stringify(info, null, 1));
 }
 
@@ -202,4 +203,4 @@ async function clearId(dir, { login, id: expect }, { log, askCode }, L = swap.li
   } finally { swap.drop(acc); }
 }
 
-module.exports = { loadAccounts, parseLine, list, selected, add, remove, setUse, patch, refresh, clearId, reveal, exportText, importText, rateLimited, stop: () => { stopped = true; wake(); }, timing, FILES, HEADER };
+module.exports = { loadAccounts, parseLine, list, selected, toCheck, add, remove, setUse, patch, refresh, clearId, reveal, exportText, importText, rateLimited, stop: () => { stopped = true; wake(); }, timing, FILES, HEADER };

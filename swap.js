@@ -160,9 +160,9 @@ const setId = (s, customURL) =>
 
 // The ID the profile shows right now, read by SteamID64 (the old /id/ may no longer be ours). One plain request: no pause
 // and no waiting on 429, because it is used while an ID may be free. null when it could not be read.
-async function peek(s) {
+async function peek(s, base = '/profiles/' + s.user.steamID.getSteamID64()) {
   const r = await new Promise((resolve) =>
-    s.community.httpRequest({ uri: HOST + '/profiles/' + s.user.steamID.getSteamID64() + '/edit/info', headers: headers() }, (err, res, body) => resolve({ err, res, body }), 'steamcommunity'));
+    s.community.httpRequest({ uri: HOST + base + '/edit/info', headers: headers() }, (err, res, body) => resolve({ err, res, body }), 'steamcommunity'));
   if (r.err || !r.res || r.res.statusCode !== 200) return null;
   const cfg = cheerio.load(r.body)('#profile_edit_config').data('profile-edit');
   return cfg && typeof cfg === 'object' ? cleanId(cfg.strCustomURL) : null;
@@ -201,7 +201,22 @@ async function loadIds({ a1, a2 }, { log, askCode }, L = libs()) {
 
 // Account 1's current ID moves to account 2. Account 1 goes to `temp` meanwhile.
 // The ID is read from account 1 itself, so a wrong ID cannot be typed in.
-async function runSwap({ a1, a2, temp }, { log, askCode }, L = libs()) {
+// The very last step, after a successful swap: account 1 takes the ID account 2 just gave up (it replaces the temporary one).
+// It never touches the swap itself: a failure is only logged. Both profile addresses are tried and only the profile page is trusted.
+async function takeOld(s1, old, log) {
+  if (!old) return log('takeNone');
+  const bases = [s1.edit.base, '/profiles/' + s1.user.steamID.getSteamID64()];
+  let last;
+  for (let i = 0; i < 3; i++) {
+    if (i) await sleep(timing.wait);
+    s1.edit.base = bases[i % 2];
+    try { await setId(s1, old); } catch (e) { last = e; }
+    if (same(await peek(s1, '/id/' + old), old) || same(await peek(s1), old)) return log('taken', { id: old });
+  }
+  log('takeFail', { id: old, msg: last ? last.message : 'the profile does not show the ID' });
+}
+
+async function runSwap({ a1, a2, temp, takeOld: take }, { log, askCode }, L = libs()) {
   temp = cleanId(temp) || 'vs' + Math.random().toString(36).slice(2, 10);
   // Steam's own rule for custom IDs; checked first so a bad one fails before anything is changed
   if (!/^[A-Za-z0-9_-]{3,32}$/.test(temp)) throw Object.assign(new Error('bad temporary ID'), { key: 'badTemp' });
@@ -213,7 +228,7 @@ async function runSwap({ a1, a2, temp }, { log, askCode }, L = libs()) {
   // Nothing has changed yet, so a failure here leaves both IDs untouched.
   await prepare(s1, 1, log);
   await prepare(s2, 2, log);
-  const target = s1.edit.current;
+  const target = s1.edit.current, old = s2.edit.current;
   if (!target) throw Object.assign(new Error('account 1 has no custom ID'), { key: 'noId1' });
   log('ready', { target });
   try {
@@ -230,6 +245,7 @@ async function runSwap({ a1, a2, temp }, { log, askCode }, L = libs()) {
     }
     if (err) await recover(s1, s2, target, err, err1 && (() => err1), log, temp, err1);
     log('done', { target });
+    if (take) await takeOld(s1, old, log);
   } finally {
     drop(a1); drop(a2); // IDs changed, so the cached state is stale
   }
@@ -243,13 +259,17 @@ async function recover(s1, s2, target, err, onKept, log, temp, err1) {
   if (same(c2, target)) return; // an error answer, but account 2 has the ID
   if (err1) log('firstFail', { msg: err1.message });
   if (onKept && same(c1, target)) throw onKept(); // nothing moved: account 1 still has its ID (a page that says so after a successful change would be stale)
-  s1.edit.base = '/profiles/' + s1.user.steamID.getSteamID64(); // put the ID back; the old /id/ page may not be ours now
+  // put the ID back, trying both addresses of the profile (the old /id/ page may not be ours now), and trust only the profile page: an answer of Steam is not enough
+  const bases = [s1.edit.base, '/profiles/' + s1.user.steamID.getSteamID64()];
+  const there = async () => same(await peek(s1, '/id/' + target), target) || same(await peek(s1), target);
   let back = false, last;
   for (let i = 0; i < 3 && !back; i++) {
     if (i) await sleep(timing.wait);
-    try { await setId(s1, target); back = true; } catch (e) { last = e; }
+    s1.edit.base = bases[i % 2];
+    try { await setId(s1, target); } catch (e) { last = e; }
+    if (await there()) back = true;
+    else last = last || new Error('Steam accepted it, but the profile does not show the ID: ' + JSON.stringify(s1.lastReply));
   }
-  if (!back) back = same(await peek(s1), target); // the last answer may have been an error although it worked
   if (back) log('rollback', { target });
   else log('rollbackFail', { msg: last.message, target, temp });
   throw err;
@@ -258,7 +278,7 @@ async function recover(s1, s2, target, err, onKept, log, temp, err1) {
 // Fast swap (test build): the ID is removed from account 1 and POST 2 follows after a few ms without waiting for Steam's answer to
 // POST 1, so the ID is free only for the time Steam needs between the two requests. A refusal of POST 2 (the clear had not landed
 // yet) is retried at once. Every request and answer is logged with its time in ms from the moment POST 1 was sent.
-async function runFastSwap({ a1, a2, offset, temp }, { log, askCode }, L = libs()) {
+async function runFastSwap({ a1, a2, offset, temp, takeOld: take }, { log, askCode }, L = libs()) {
   const off = Number.isFinite(+offset) ? Math.max(+offset, timing.fastOffset) : timing.fastOffset; // below the minimum Steam refuses POST 1 (seen on the real service)
   const first = cleanId(temp) || 'vs' + Math.random().toString(36).slice(2, 10); // account 1 is set to a temporary ID: clearing it does not release the ID at once
   if (!/^[A-Za-z0-9_-]{3,32}$/.test(first)) throw Object.assign(new Error('bad temporary ID'), { key: 'badTemp' });
@@ -266,20 +286,17 @@ async function runFastSwap({ a1, a2, offset, temp }, { log, askCode }, L = libs(
   const [s1, s2] = await Promise.all([session(a1, 1, log, askCode, L), session(a2, 2, log, askCode, L)]);
   await prepare(s1, 1, log); // the checks run as usual, before anything changes
   await prepare(s2, 2, log);
-  const target = s1.edit.current;
+  const target = s1.edit.current, old = s2.edit.current;
   if (!target) throw Object.assign(new Error('account 1 has no custom ID'), { key: 'noId1' });
   log('ready', { target });
   try {
     const t0 = performance.now(), at = () => Math.round(performance.now() - t0);
     const note = (m) => log('fastLog', { m });
     note(`target “${target}”, offset ${off} ms, account 1 is set to “${first}”`);
-    // what the profile of account 1 shows, read on the side (a separate request, nothing waits for it): tells whether and when the ID is really released
-    const probes = [];
-    const probe = (why) => { const sent = at(); probes.push(peek(s1).then((v) => note(`profile of account 1 read ${why}: sent ${sent} ms, answered ${at()} ms: ${v === null ? 'unreadable' : v ? '/id/' + v : 'no custom ID'}`)).catch(() => {})); };
     let p1done = false, err1 = null;
     note(`POST 1 (temporary ID of account 1) sent at 0 ms`);
-    const p1 = setId(s1, first).then(() => { p1done = true; note(`POST 1 answered at ${at()} ms: ok, reply ${JSON.stringify(s1.lastReply)}`); probe('after POST 1 answered'); },
-      (e) => { err1 = e; p1done = true; note(`POST 1 answered at ${at()} ms: ${e.message}, reply ${JSON.stringify(s1.lastReply)}`); probe('after POST 1 answered'); }); // never rejects: an error answer is normal
+    const p1 = setId(s1, first).then(() => { p1done = true; note(`POST 1 answered at ${at()} ms: ok, reply ${JSON.stringify(s1.lastReply)}`); },
+      (e) => { err1 = e; p1done = true; note(`POST 1 answered at ${at()} ms: ${e.message}, reply ${JSON.stringify(s1.lastReply)}`); }); // never rejects: an error answer is normal
     await sleep(off);
     let err = null, after = 0;
     for (let i = 1; i <= timing.fastTries; i++) {
@@ -288,15 +305,14 @@ async function runFastSwap({ a1, a2, offset, temp }, { log, askCode }, L = libs(
       try { await setId(s2, target); err = null; note(`POST 2 #${i} answered at ${at()} ms: ok, reply ${JSON.stringify(s2.lastReply)}`); break; }
       catch (e) {
         err = e; note(`POST 2 #${i} answered at ${at()} ms: ${e.message}, reply ${JSON.stringify(s2.lastReply)}`);
-        probe(`after POST 2 #${i} was refused`);
         if (/\b429\b/.test(e.message)) await sleep(timing.wait); // rate limit: hurrying makes it worse
       }
     }
     await p1;
-    await Promise.all(probes);
     if (err) await recover(s1, s2, target, err, () => Object.assign(new Error('ID kept'), { key: 'fastKept', p: { target, msg: (err1 || err).message } }), log, first, err1);
     note(`finished at ${at()} ms`);
     log('done', { target });
+    if (take) await takeOld(s1, old, log);
   } finally {
     drop(a1); drop(a2);
   }
