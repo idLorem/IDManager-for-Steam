@@ -4,7 +4,7 @@
 
 Portable Windows app (Electron) for managing Steam custom profile URLs (`steamcommunity.com/id/<name>`):
 
-- **Swapper** – transfers a custom ID from account 1 to account 2 as fast as possible; validation checks run only after the swap so nothing slows it down.
+- **Swapper** – transfers a custom ID from account 1 to account 2 as fast as possible; validation checks run only after the swap so nothing slows it down. **Fast swap** sends the claim on account 2 right after the temporary ID request, without waiting for its answer (the ID on account 1 should not have been changed for at least an hour).
 - **Account manager** – reads accounts from `accounts.txt`, fetches each account's SteamID64 and current custom ID, and exports/imports an encrypted config (`.vsa`).
 - **Free ID search** – checks IDs from `ids.txt`, saves available ones to `available.txt`, and claims them with the next account that doesn't have a custom ID yet (`claimed.txt` logs who took what).
 
@@ -68,7 +68,7 @@ MIT, see [LICENSE](LICENSE).
 
 Портативная утилита на Electron (Windows) для работы с кастомными ссылками профиля Steam (`steamcommunity.com/id/<name>`):
 
-- **Swapper** – максимально быстро перекидывает кастомный ID с первого аккаунта на второй; все проверки идут уже после переноса, чтобы не терять время.
+- **Swapper** – максимально быстро перекидывает кастомный ID с первого аккаунта на второй; все проверки идут уже после переноса, чтобы не терять время. **Быстрый обмен** отправляет захват на втором аккаунте сразу после запроса временного ID, не дожидаясь ответа (ID на аккаунте 1 не должен меняться минимум час).
 - **Менеджер аккаунтов** – держит базу в `accounts.txt`, подтягивает SteamID64 и текущий ID, экспортирует и импортирует зашифрованный конфиг (`.vsa`).
 - **Поиск свободных ID** – прогоняет список из `ids.txt`, свободные складывает в `available.txt` и занимает следующим аккаунтом без своего ID (`claimed.txt` – лог того, кто что забрал).
 

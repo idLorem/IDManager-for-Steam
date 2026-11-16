@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('api', {
   start: (cfg) => ipcRenderer.invoke('start', cfg),
+  startFast: (cfg) => ipcRenderer.invoke('start-fast', cfg),
   loadIds: (cfg) => ipcRenderer.invoke('load-ids', cfg),
   hunt: (cfg) => ipcRenderer.invoke('hunt', cfg),
   tuneHunt: (cfg) => ipcRenderer.send('hunt-tune', cfg),

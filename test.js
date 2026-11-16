@@ -1,6 +1,6 @@
 const assert = require('assert');
 const { EventEmitter } = require('events');
-const { runSwap, loadIds, timing } = require('./swap');
+const { runSwap, runFastSwap, loadIds, timing } = require('./swap');
 const swapTiming = timing;
 const { makeAsker } = require('./prompt');
 const hunt = require('./hunt');
@@ -113,6 +113,44 @@ const cfg = { a1: { login: 'a', password: 'b' }, a2: { login: 'c', password: 'd'
   assert.deepStrictEqual(posts.splice(0), ['tmp1', 'cool']);
   emptyName = false;
   assert.strictEqual(noLang, 0); // every GET and POST carried Accept-Language
+
+  // fast swap: account 1 gets a temporary ID and POST 2 follows without waiting for the answer
+  swapTiming.fastOffset = 1;
+  const fcfg = { a1: cfg.a1, a2: cfg.a2, temp: 'tmp9' };
+  logs.length = 0;
+  await runFastSwap(fcfg, io, L);
+  assert.deepStrictEqual(posts.splice(0), ['tmp9', 'cool']);
+  assert(logs.some(([k, p]) => k === 'fastLog' && /POST 2 #1 answered at \d+ ms: ok/.test(p.m)));
+  delete owned.a; delete owned.c; // the fake keeps the cleared ID between runs
+  failTarget = 2; // the clear had not landed yet: two refusals, retried at once, the third goes through
+  await runFastSwap(fcfg, io, L);
+  assert.deepStrictEqual(posts.splice(0), ['tmp9', 'cool', 'cool', 'cool']);
+  delete owned.a; delete owned.c;
+  quirk = true; // Steam answers the first request with an error although the ID is gone
+  await runFastSwap(fcfg, io, L);
+  assert.deepStrictEqual(posts.splice(0), ['tmp9', 'cool']);
+  quirk = false; delete owned.a; delete owned.c;
+  failTarget = 3; track = true; // account 2 never gets it: the profiles are read, account 1 gets the ID back
+  await assert.rejects(runFastSwap(fcfg, io, L), /taken/);
+  assert.deepStrictEqual(posts.splice(0), ['tmp9', 'cool', 'cool', 'cool', 'cool']);
+  track = false; delete owned.a; delete owned.c;
+  failTarget = 3; // Steam kept the ID on account 1 (the change was ignored): nothing moved, no rollback
+  keep.add('a');
+  await assert.rejects(runFastSwap(fcfg, io, L), (e) => e.key === 'fastKept' && e.p.target === 'cool');
+  assert.deepStrictEqual(posts.splice(0), ['tmp9', 'cool', 'cool', 'cool']);
+  keep.delete('a'); delete owned.a; delete owned.c; failTarget = 0;
+  await assert.rejects(runFastSwap({ a1: cfg.a2, a2: cfg.a1 }, io, L), (e) => e.key === 'noId1'); // checks as usual: nothing may change
+  assert.deepStrictEqual(posts.splice(0), []);
+  logs.length = 0;
+  swapTiming.fastOffset = 30; await runFastSwap({ ...fcfg, offset: 5 }, io, L); // an offset below the minimum is raised to it
+  assert.deepStrictEqual(posts.splice(0), ['tmp9', 'cool']);
+  const fl = logs.filter(([k]) => k === 'fastLog').map(([, p]) => p.m).join('\n');
+  assert(/offset 30 ms/.test(fl));
+  swapTiming.fastOffset = 1;
+  assert(/POST 1 answered at \d+ ms: ok, reply \{"success":1\}/.test(fl)); // the raw reply is logged
+  assert(/profile of account 1 read after POST 1 answered/.test(fl)); // the side read of account 1
+  await assert.rejects(runFastSwap({ ...fcfg, temp: 'x' }, io, L), (e) => e.key === 'badTemp'); // checked before anything changes
+  assert.deepStrictEqual(posts.splice(0), []);
 
   // Steam Guard prompts: one at a time, and a timeout does not block the next one
   const bus = new EventEmitter(), asked = [];

@@ -57,7 +57,7 @@ function list(dir) {
   const info = readInfo(dir);
   return loadAccounts(dir).accounts.map(({ login, secret }) => {
     const m = info[login] || {};
-    return { login, secret: !!secret, use: m.use !== false, steamId: m.steamId || '', id: m.id || '', guard: !!m.guard, err: m.err || '' };
+    return { login, secret: !!secret, use: m.use !== false, steamId: m.steamId || '', id: m.id || '', guard: !!m.guard, err: m.err || '', stale: !!m.stale };
   });
 }
 const selected = (dir) => list(dir).filter((a) => a.use).map((a) => a.login);
@@ -161,7 +161,7 @@ async function refresh(dir, logins, { log, askCode }, L = swap.libs()) {
       const s = await Promise.race([p, stopP.then(() => { p.then(() => swap.drop(acc), () => {}); throw Object.assign(new Error('stopped'), { stopped: true }); })]);
       const steamId = s.user.steamID.getSteamID64(), id = swap.cleanId(s.user.vanityURL);
       // "needs a code" is known only from a real login: a cached session says nothing about it
-      patch(dir, acc.login, { steamId, id, err: '', ...(s.at >= t0 ? { guard } : {}) });
+      patch(dir, acc.login, { steamId, id, err: '', stale: false, ...(s.at >= t0 ? { guard } : {}) });
       log('accChecked', { login: acc.login, steamId, id });
       ok++;
     } catch (e) {

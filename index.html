@@ -60,8 +60,8 @@ h1{display:flex;align-items:center;gap:12px;margin:0;font-size:20px;line-height:
 .field{margin-top:12px}
 label{display:block;margin-bottom:4px;font-size:12px;line-height:16px;color:var(--fg2)}
 .hint{margin-top:4px;font-size:12px;line-height:16px;color:var(--mut);text-wrap:pretty}
-input{width:100%;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--fg);font:14px var(--sans);transition:border-color .15s var(--ease)}
-input:hover{border-color:var(--line2)}
+input,select{width:100%;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--fg);font:14px var(--sans);transition:border-color .15s var(--ease)}
+input:hover,select:hover{border-color:var(--line2)}
 input:focus-visible,button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 .pre{display:flex;align-items:center;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--field);transition:border-color .15s var(--ease)}
 .pre:hover{border-color:var(--line2)}
@@ -140,8 +140,8 @@ input[type=checkbox]:disabled{opacity:.4;cursor:default}
 #log{height:288px;overflow:auto;font:12px/20px var(--mono);color:var(--fg2)}
 #log div{display:flex;gap:12px}#log time{flex:none;color:var(--mut)}
 #log .ok{color:var(--pos)}#log .bad{color:var(--neg)}
-#foot{display:none;position:fixed;left:0;right:0;bottom:0;z-index:5;gap:12px;align-items:center;height:32px;padding:0 32px;background:var(--card);border-top:1px solid var(--line);font:12px/20px var(--mono);color:var(--fg2);cursor:pointer;white-space:nowrap;overflow:hidden}
-#foot.show{display:flex}#foot time{flex:none;color:var(--mut)}#foot span{overflow:hidden;text-overflow:ellipsis}
+#foot{display:none;position:fixed;left:0;right:0;bottom:0;z-index:5;flex-direction:column;justify-content:flex-end;height:32px;padding:6px 32px;box-sizing:border-box;background:var(--card);border-top:1px solid var(--line);font:12px/20px var(--mono);color:var(--fg2);cursor:pointer;white-space:nowrap;overflow:hidden}
+#foot.show{display:flex}#foot.open{height:133px;overflow-y:auto}#foot div{display:flex;gap:12px;flex:none}#foot time{flex:none;color:var(--mut)}#foot span{overflow:hidden;text-overflow:ellipsis}
 #foot .ok{color:var(--pos)}#foot .bad{color:var(--neg)}
 #helpDlg{width:min(640px,calc(100% - 32px));max-height:calc(100% - 64px);padding:24px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg);box-shadow:var(--shadow);overflow:auto}
 #helpDlg[open]{animation:pop .18s ease-out}
@@ -166,6 +166,7 @@ textarea:hover{border-color:var(--line2)}textarea:focus-visible{outline:2px soli
 .ar .m{font:12px/16px var(--mono);color:var(--fg2)}
 .ar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:16px;color:var(--mut)}
 .ar small.e{color:var(--neg)}
+.ar.stale{background:var(--hover);box-shadow:inset 2px 0 var(--fg2)}
 .ar.none{display:block;color:var(--mut)}
 .ar:not(.h):not(.none):not(.d){cursor:pointer;transition:background-color .15s var(--ease)}.ar:not(.h):not(.none):not(.d):hover{background:var(--hover)}
 .ar:has(+ .ar.d){border-bottom-color:transparent}
@@ -225,7 +226,7 @@ textarea:hover{border-color:var(--line2)}textarea:focus-visible{outline:2px soli
   <div class="row"><input id="code" autocomplete="off" spellcheck="false" aria-label="Steam Guard"><button class="btn sec" id="send" data-i="send"></button><button class="btn sec" id="skip" data-i="skipLogin"></button></div>
 </section>
 
-<div class="bar"><button class="btn" id="go"></button><p data-i="privacy"></p></div>
+<div class="bar"><button class="btn" id="go"></button><button class="btn sec" id="fast" data-i="fastBtn"></button><input id="fastOff" type="number" min="80" max="2000" step="5" value="80" aria-label="ms" style="width:72px"><span class="hint" style="margin:0">ms</span><p data-i="privacy"></p></div>
 </section>
 
 <section class="card" id="mgr">
@@ -271,7 +272,7 @@ textarea:hover{border-color:var(--line2)}textarea:focus-visible{outline:2px soli
   <div class="hd"><h2 id="helpT" data-i="help"></h2><button class="btn sec sm" id="helpX" data-i="close"></button></div>
   <div id="helpBody"></div>
 </dialog>
-<div id="foot" role="status"><time></time><span></span></div>
+<div id="foot" role="status"></div>
 
 <script>
 const I={
@@ -318,7 +319,7 @@ ru:{title:'IDManager for Steam',swapTitle:'Swapper',acc:'Аккаунт',cap1:'�
   mgrAll:'Выбрать все',mgrNone:'Снять все',mgrNoId:'Выбрать без ID',mgrRefresh:'Проверить выбранные',mgrStop:'Остановить',
   mgrPw:'пароль',mgrImport:'Импорт из текста',mgrFile:'Выбрать файл конфига',mgrExport:'Скачать конфиг',mgrCfgTitle:'Перенос аккаунтов',mgrPassLabel:'Пароль конфига',
   mgrPassHint:'Им шифруется скачиваемый файл (от 5 символов, с цифрой и заглавной буквой), тот же пароль нужен при импорте. Для импорта введите пароль и выберите файл .vsa, либо вставьте его текст в поле «Добавить аккаунты» выше',
-  mgrExported:'Конфиг сохранён: {file}',passWeak:'Пароль конфига: минимум 5 символов, с цифрой и заглавной буквой',huntSkipId:'Пропущено аккаунтов, у которых уже есть ID: {n} (нажмите «Проверить выбранные» в менеджере, чтобы обновить данные)',huntLoginLimit:'Steam ограничил частоту входов или запросов: аккаунты пока не берутся, при следующей находке попробую снова',themeLight:'Светлая тема',themeDark:'Тёмная тема',upd:'Обновление',gh:'GitHub',help:'Помощь',close:'Закрыть',updAuto:'Проверять обновления при запуске',updNew:'Доступна новая версия {v}: нажмите «Обновление», чтобы скачать',updLatest:'У вас последняя версия ({v})',updNone:'Релизов на GitHub пока нет',updFail:'Не удалось проверить обновления',verText:'Версия {v}',noLink:'Ссылка на GitHub ещё не задана в программе',noAccounts:'Нет аккаунтов для экспорта',
+  mgrExported:'Конфиг сохранён: {file}',passWeak:'Пароль конфига: минимум 5 символов, с цифрой и заглавной буквой',huntSkipId:'Пропущено аккаунтов, у которых уже есть ID: {n} (нажмите «Проверить выбранные» в менеджере, чтобы обновить данные)',huntLoginLimit:'Steam ограничил частоту входов или запросов: аккаунты пока не берутся, при следующей находке попробую снова',fastBtn:'Быстрый обмен',fastWarn:'Быстрый обмен: ID не должен был меняться на аккаунте 1 минимум час, иначе Steam может отклонить смену. Продолжить?',mgrStale:'Изменён: проверьте заново',fastLog:'{m}',fastKept:'Быстрый обмен: Steam не освободил ID аккаунта 1 («{target}» на месте), ничего не перенесено. {msg}',themeLight:'Светлая тема',themeDark:'Тёмная тема',upd:'Обновление',gh:'GitHub',help:'Помощь',close:'Закрыть',updAuto:'Проверять обновления при запуске',updNew:'Доступна новая версия {v}: нажмите «Обновление», чтобы скачать',updLatest:'У вас последняя версия ({v})',updNone:'Релизов на GitHub пока нет',updFail:'Не удалось проверить обновления',verText:'Версия {v}',noLink:'Ссылка на GitHub ещё не задана в программе',noAccounts:'Нет аккаунтов для экспорта',
   badConfig:'Это не конфиг IDManager for Steam: текст должен начинаться с VSA1.',badPass:'Неверный пароль или файл повреждён',
   mgrAddLabel:'Добавить аккаунты',mgrAddHint:'По одному в строке: логин:пароль или логин:пароль:shared_secret (тогда коды Steam Guard вводятся сами). Известный логин получит новый пароль',mgrAdd:'Добавить',
   mgrEmpty:'Аккаунтов пока нет, добавьте их ниже',mgrSteamId:'SteamID64',mgrId:'Свой ID',mgrClear:'Очистить ID',mgrRemove:'Удалить',
@@ -376,7 +377,7 @@ en:{title:'IDManager for Steam',swapTitle:'Swapper',acc:'Account',cap1:'Owns the
   mgrAll:'Select all',mgrNone:'Clear all',mgrNoId:'Select without ID',mgrRefresh:'Check selected',mgrStop:'Stop',
   mgrPw:'password',mgrImport:'Import from text',mgrFile:'Choose config file',mgrExport:'Download config',mgrCfgTitle:'Move accounts',mgrPassLabel:'Config password',
   mgrPassHint:'It encrypts the downloaded file (at least 5 characters, with a digit and a capital letter); the same password is needed to import it. To import, enter the password and choose the .vsa file, or paste its text into “Add accounts” above',
-  mgrExported:'Config saved: {file}',passWeak:'Config password: at least 5 characters, with a digit and a capital letter',huntSkipId:'Skipped accounts that already have an ID: {n} (press Check selected in the manager to refresh what is known)',huntLoginLimit:'Steam limited sign-ins or requests: accounts are not taken for now, I will try again on the next find',themeLight:'Light theme',themeDark:'Dark theme',upd:'Update',gh:'GitHub',help:'Help',close:'Close',updAuto:'Check for updates on start',updNew:'New version {v} is available: press Update to download it',updLatest:'You have the latest version ({v})',updNone:'No releases on GitHub yet',updFail:'Could not check for updates',verText:'Version {v}',noLink:'The GitHub link is not set in the program yet',noAccounts:'No accounts to export',
+  mgrExported:'Config saved: {file}',passWeak:'Config password: at least 5 characters, with a digit and a capital letter',huntSkipId:'Skipped accounts that already have an ID: {n} (press Check selected in the manager to refresh what is known)',huntLoginLimit:'Steam limited sign-ins or requests: accounts are not taken for now, I will try again on the next find',fastBtn:'Fast swap',fastWarn:'Fast swap: the ID on account 1 must not have been changed for at least an hour, or Steam may refuse the change. Continue?',mgrStale:'Changed: check again',fastLog:'{m}',fastKept:'Fast swap: Steam did not release the ID of account 1 (“{target}” is still there), nothing was moved. {msg}',themeLight:'Light theme',themeDark:'Dark theme',upd:'Update',gh:'GitHub',help:'Help',close:'Close',updAuto:'Check for updates on start',updNew:'New version {v} is available: press Update to download it',updLatest:'You have the latest version ({v})',updNone:'No releases on GitHub yet',updFail:'Could not check for updates',verText:'Version {v}',noLink:'The GitHub link is not set in the program yet',noAccounts:'No accounts to export',
   badConfig:'This is not an IDManager for Steam config: the text must start with VSA1.',badPass:'Wrong password or the file is damaged',
   mgrAddLabel:'Add accounts',mgrAddHint:'One per line: login:password or login:password:shared_secret (then Steam Guard codes are entered automatically). A known login gets the new password',mgrAdd:'Add',
   mgrEmpty:'No accounts yet, add them below',mgrSteamId:'SteamID64',mgrId:'Custom ID',mgrClear:'Clear ID',mgrRemove:'Delete',
@@ -414,7 +415,7 @@ const t=(k,p={})=>(I[lang][k]||k).replace(/\{(\w+)\}/g,(_,x)=>p[x]??'');
 const pad=n=>String(n).padStart(2,'0');
 const entries=[],cur={1:'',2:''};let accs=[],refreshing=false,busy=false,hunting=false,prog=null,guard=null,moved='',swapped=false,loaded=false; // swapped: IDs changed, running again would move the temporary ID
 const hideGuard=()=>{$('guard').style.display='none';guard=null};
-const lock=v=>{busy=v;renderAcc();$('go').disabled=v||swapped;$('load').disabled=v;$('hunt').disabled=v&&!hunting;if(!v)hideGuard()};
+const lock=v=>{busy=v;renderAcc();$('go').disabled=v||swapped;$('fast').disabled=v||swapped;$('load').disabled=v;$('hunt').disabled=v&&!hunting;if(!v)hideGuard()};
 const gtext=()=>(guard.w?t('guardWrong'):'')+(guard.d?t('guardMail',{n:guard.n,d:guard.d}):t('guardApp',{n:guard.n}));
 
 function render(){
@@ -448,14 +449,17 @@ function render(){
 }
 // the last journal line, pinned to the bottom of the window while the journal itself is scrolled out of view
 function foot(){
-  const x=entries[entries.length-1],f=$('foot');
-  f.querySelector('time').textContent=x?x.time:'';
-  const m=f.querySelector('span');m.textContent=x?t(x.key,x.p)+(x.raw?': '+x.raw:''):'';m.className=x&&x.cls||'';
-  f.dataset.has=x?'1':'';f.classList.toggle('show',!!x&&!seen);
+  const f=$('foot'),open=f.classList.contains('open');
+  f.replaceChildren(...entries.slice(open?-6:-1).map(x=>{
+    const row=document.createElement('div'),tm=document.createElement('time'),m=document.createElement('span');
+    tm.textContent=x.time;m.textContent=t(x.key,x.p)+(x.raw?': '+x.raw:'');m.className=x.cls||'';
+    row.append(tm,m);return row;
+  }));
+  f.classList.toggle('show',!!entries.length&&!seen);
 }
 let seen=true;
 new IntersectionObserver(([e])=>{seen=e.isIntersecting;foot()},{rootMargin:'0px 0px -32px 0px'}).observe($('log'));
-$('foot').onclick=()=>$('log').scrollIntoView({behavior:'smooth',block:'center'});
+$('foot').onclick=()=>{$('foot').classList.toggle('open');foot()}; // grows upward to the last 6 lines, a second click folds it
 function flow(){
   $('n1').textContent=$('l1').value.trim()||t('acc')+' 1';
   $('n2').textContent=$('l2').value.trim()||t('acc')+' 2';
@@ -502,7 +506,7 @@ $('code').onkeydown=e=>{if(e.key==='Enter')sendCode()};
 document.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;store.set(lang);render();renderAcc()});
 $('theme').onclick=()=>{const v=document.documentElement.dataset.theme==='light'?'dark':'light';document.documentElement.dataset.theme=v;try{localStorage.setItem('theme',v)}catch{}render()};
 ['l1','l2'].forEach(id=>$(id).addEventListener('input',flow));
-['l1','p1','l2','p2'].forEach(id=>$(id).addEventListener('input',()=>{cur[1]=cur[2]='';moved='';swapped=loaded=false;$('go').disabled=busy;flow()})); // loaded IDs belong to the old logins
+['l1','p1','l2','p2'].forEach(id=>$(id).addEventListener('input',()=>{cur[1]=cur[2]='';moved='';swapped=loaded=false;$('go').disabled=busy;$('fast').disabled=busy;flow()})); // loaded IDs belong to the old logins
 
 const creds=()=>({a1:{login:$('l1').value.trim(),password:$('p1').value,secret:$('s1').value.trim()},
   a2:{login:$('l2').value.trim(),password:$('p2').value,secret:$('s2').value.trim()}});
@@ -523,16 +527,19 @@ $('load').onclick=async()=>{
   render();
 };
 
-$('go').onclick=async()=>{
-  if(!confirm([t('confirm'),cur[1]&&'/id/'+cur[1]+' → '+t('acc')+' 2',$('lose').textContent].filter(Boolean).join('\n')))return;
+const runSwapUi=fast=>async()=>{
+  if(!confirm([t('confirm'),cur[1]&&'/id/'+cur[1]+' → '+t('acc')+' 2',$('lose').textContent,fast&&t('fastWarn')].filter(Boolean).join('\n')))return;
   reset();lock(true);render();
-  const r=await api.start({...creds(),temp:$('temp').value.trim()});
+  const r=fast?await api.startFast({...creds(),offset:$('fastOff').value,temp:$('temp').value.trim()}):await api.start({...creds(),temp:$('temp').value.trim()});
   if(r&&r.ok)swapped=true;
   lock(false);
   if(r&&r.error)fail(r);
   else if(r&&r.ok){cur[1]=cur[2]='';loaded=false;push('again',{},'')} // IDs changed, loaded values are stale
+  loadAccs(); // the two accounts were changed: unticked and marked in the manager
   render();
 };
+$('fastOff').onchange=()=>{if(!(+$('fastOff').value>=80))$('fastOff').value=80};
+$('go').onclick=runSwapUi(false);$('fast').onclick=runSwapUi(true);
 // sliders: base pause between checks (tenths of a second), request timeout and first pause after a 429 (seconds); saved, and live during a run
 const tuneKey='tune';
 const tune=()=>({gap:$('rGap').value*100,timeout:$('rTimeout').value*1000,rateWait:$('rRate').value*1000});
@@ -617,13 +624,13 @@ function renderAcc(){
   else{
     const h=div('ar h');h.append(div(''),th('login','login'),th('steamId','mgrSteamId'),th('id','mgrId'),div(''));box.append(h);
     for(const [i,a] of V.entries()){
-      const r=div('ar'),cb=document.createElement('input');
+      const r=div('ar'+(a.stale?' stale':'')),cb=document.createElement('input');
       cb.type='checkbox';cb.checked=a.use;cb.disabled=busy;cb.setAttribute('aria-label',a.login);
       cb.onclick=e=>pick(i,e,cb.checked);
       // click on the row shows the password, Shift+click ticks a range like in a file manager
       r.onclick=e=>{if(e.target.closest('button,input'))return;if(e.shiftKey){getSelection().removeAllRanges();if(!busy)pick(i,e,!a.use)}else toggleShow(a)};
       const who=div('t',a.login),note=document.createElement('small');
-      note.textContent=a.err||(a.secret?t('mgrSecret'):a.guard?t('mgrManual'):'');
+      note.textContent=a.err||(a.stale?t('mgrStale'):a.secret?t('mgrSecret'):a.guard?t('mgrManual'):'');
       if(a.err)note.className='e';
       who.append(note);
       const clr=Object.assign(document.createElement('button'),{className:'btn sec sm',textContent:t('mgrClear'),disabled:busy||!a.id});

@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, dialog, clipboard } =require('electron');
 const fs = require('fs');
 const path = require('path');
-const { runSwap, loadIds, closeAll } = require('./swap');
+const { runSwap, runFastSwap, loadIds, closeAll } = require('./swap');
 const { makeAsker } = require('./prompt');
 const { runHunt, stopHunt, initFiles, readIds, tune } = require('./hunt');
 const acc = require('./accounts');
@@ -81,13 +81,27 @@ const op = (fn, needAccounts = true) => async (_e, cfg) => {
   finally { askCode.cancel(); busy = false; } // a login still waiting for a code must not prompt after the end
 };
 
-ipcMain.handle('start', op(runSwap));
+// an account the program changed is unticked and marked in the manager: what is known about it is out of date
+const changed = (...logins) => { try { const known = acc.loadAccounts(dir).accounts.map((x) => x.login); for (const l of logins) if (known.includes(l)) acc.patch(dir, l, { use: false, stale: true }); } catch {} }; // only accounts of the manager (a login typed by hand is not in the list)
+const afterSwap = (run) => async (cfg, io) => { const r = await run(cfg, io); changed(cfg.a1.login, cfg.a2.login); return r; };
+ipcMain.handle('start', op(afterSwap(runSwap)));
+// everything the fast swap logs goes to a file next to the exe as well, with the final result
+const fastFile = (line) => { try { fs.appendFileSync(path.join(dir, 'fastswap-log.txt'), new Date().toISOString() + ' ' + line + '\n'); } catch {} };
+ipcMain.handle('start-fast', op(afterSwap(async (cfg, io) => {
+  fastFile('--- fast swap, offset ' + cfg.offset + ' ms');
+  try {
+    const r = await runFastSwap(cfg, { ...io, log: (k, p) => { fastFile(k === 'fastLog' ? p.m : k + ' ' + JSON.stringify(p || {})); io.log(k, p); } });
+    fastFile('RESULT ok');
+    return r;
+  } catch (e) { fastFile('RESULT error ' + (e.key || '') + ' ' + e.message + (e.p ? ' ' + JSON.stringify(e.p) : '')); throw e; }
+})));
 ipcMain.handle('load-ids', op(loadIds));
 // the search uses the accounts ticked in the manager; what it learns about them (own ID) is stored back
 ipcMain.handle('hunt', op((cfg, io) => runHunt({ ...cfg, logins: acc.selected(dir) }, {
   ...io,
   log: (k, p) => {
     if (k === 'claimed' || k === 'accHasId') { try { acc.patch(dir, p.login, { id: p.id }); } catch {} }
+    if (k === 'claimed') changed(p.login);
     io.log(k, p);
   },
 }), false));
