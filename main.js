@@ -1,10 +1,11 @@
-const { app, BrowserWindow, ipcMain, shell, dialog, clipboard } =require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, clipboard, Tray, Menu, nativeImage } =require('electron');
 const fs = require('fs');
 const path = require('path');
 const { runSwap, runFastSwap, loadIds, closeAll } = require('./swap');
 const { makeAsker } = require('./prompt');
-const { runHunt, stopHunt, initFiles, readIds, tune } = require('./hunt');
+const { runHunt, stopHunt, initFiles, readIds, tune, FILES } = require('./hunt');
 const acc = require('./accounts');
+const proxy = require('./proxy');
 
 // The portable exe unpacks itself to a temp folder, so the files go next to the exe it was started from.
 const dir = process.env.PORTABLE_EXECUTABLE_DIR || (app.isPackaged ? path.dirname(process.execPath) : __dirname);
@@ -12,18 +13,43 @@ const dir = process.env.PORTABLE_EXECUTABLE_DIR || (app.isPackaged ? path.dirnam
 // a covered window or a locked remote session must not make Chromium stop drawing: a long search keeps updating the journal
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-let win;
+// settings.json next to the exe: {tray}. Start with the system is kept by Windows itself (the Run entry of the exe).
+const settingsFile = path.join(dir, 'settings.json');
+const readSettings = () => { try { return { tray: !!JSON.parse(fs.readFileSync(settingsFile, 'utf8')).tray }; } catch { return { tray: false }; } };
+const settings = readSettings();
+const exeFile = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath; // the portable exe unpacks to a temp folder: the Run entry must point at the exe itself
+const loginOpts = { path: exeFile, args: ['--autostart'] };
+let win, tray = null, quitting = false;
+const showWin = () => { if (!win) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); };
+const syncTray = () => {
+  if (settings.tray && !tray) {
+    tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'build', 'icon.png')).resize({ width: 16, height: 16 }));
+    tray.setToolTip('IDManager for Steam');
+    tray.setContextMenu(Menu.buildFromTemplate([{ label: 'Open / Открыть', click: showWin }, { label: 'Exit / Выход', click: () => app.quit() }]));
+    tray.on('click', showWin);
+  } else if (!settings.tray && tray) { tray.destroy(); tray = null; }
+};
+// one window: a second start (the exe again) brings the hidden one back instead of opening another copy
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) app.quit();
+app.on('second-instance', showWin);
 app.whenReady().then(() => {
+  if (!gotLock) return;
   win = new BrowserWindow({
+    show: !(settings.tray && process.argv.includes('--autostart')), // started by the system with the tray on: stays in the tray
     width: 960, height: 900, minWidth: 720, minHeight: 640,
     autoHideMenuBar: true, backgroundColor: '#0b0b0c', icon: path.join(__dirname, 'build', 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false }, // a long search must keep drawing when the window is covered or the remote session is locked
   });
   win.loadFile('index.html');
+  syncTray();
+  // with the tray on, the close button hides the window; the search goes on in the background
+  win.on('close', (e) => { if (settings.tray && !quitting) { e.preventDefault(); win.hide(); } });
+  win.on('session-end', () => { quitting = true; }); // a closed-to-tray window must not hold up the shutdown of Windows
   try { initFiles(dir); } catch {} // ids.txt, available.txt and accounts.txt are made on start; existing ones stay as they are (e.g. a read-only folder just skips this)
 });
 app.on('window-all-closed', () => app.quit());
-app.on('before-quit', closeAll);
+app.on('before-quit', () => { quitting = true; closeAll(); });
 
 const askCode = makeAsker({
   ask: (n, domain, wrong) => win.webContents.send('ask-code', n, domain, wrong),
@@ -40,9 +66,8 @@ ipcMain.handle('acc-copy', (_e, { login, what }) => {
   try { const a = acc.reveal(dir, login); clipboard.writeText(what === 'login' ? login : a.password); return { ok: true }; } catch (e) { return { error: { key: e.key, p: e.p, msg: e.message } }; }
 });
 
-// Where the project lives. Put the address here once it is published (https://github.com/<user>/<repo>); until then the two buttons only say that it is not set.
 const REPO = 'https://github.com/idLorem/IDManager-for-Steam';
-const LINKS = { github: REPO, update: REPO && REPO + '/releases/latest' };
+const LINKS = { github: REPO, update: REPO + '/releases/latest' };
 // true when version a is newer than b (v1.2.3 style, numbers only)
 const newer = (a, b) => {
   const n = (v) => String(v).replace(/^v/i, '').split('.').map((x) => parseInt(x, 10) || 0);
@@ -53,7 +78,6 @@ const newer = (a, b) => {
 ipcMain.handle('app-info', () => ({ version: app.getVersion() }));
 ipcMain.handle('update-check', async () => {
   try {
-    if (!REPO) return { error: { key: 'noLink' } };
     const r = await fetch(REPO.replace('github.com/', 'api.github.com/repos/') + '/releases/latest', { headers: { 'User-Agent': 'IDManager-for-Steam', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000) });
     if (r.status === 404) return { ok: true, result: { none: true } }; // no release published yet
     if (!r.ok) throw new Error('GitHub answered ' + r.status);
@@ -69,6 +93,12 @@ ipcMain.handle('open-link', async (_e, key) => {
   } catch (e) { return failure(e); }
 });
 
+// proxy.json next to the exe keeps the address
+const proxyFile = path.join(dir, 'proxy.json');
+// only the address is kept; the proxy itself is always off after a start
+const readProxy = () => { try { return String(JSON.parse(fs.readFileSync(proxyFile, 'utf8')).url || ''); } catch { return ''; } };
+// swap and the account manager do not run through a proxy: one more address for the accounts could get them flagged
+const noProxy = (fn) => (e, a) => (proxy.get() ? { error: { key: 'proxyLocked' } } : fn(e, a));
 let busy = false;
 // Runs one operation at a time. Swap and load need both accounts filled in (needAccounts).
 const op = (fn, needAccounts = true) => async (_e, cfg) => {
@@ -91,12 +121,36 @@ const afterSwap = (run) => async (cfg, io) => {
   let went = false;
   try { return await run(cfg, { ...io, log: (k, p) => { if (k === 'ready') went = true; io.log(k, p); } }); } finally { if (went) changed(cfg.a1.login, cfg.a2.login); }
 };
-ipcMain.handle('start', op(afterSwap(runSwap)));
+ipcMain.handle('proxy-get', () => ({ ok: true, result: { url: readProxy(), on: !!proxy.get() } }));
+// a change takes effect for the next logins: open sessions are closed, and nothing may change while an operation runs
+ipcMain.handle('proxy-set', (_e, { url, on }) => {
+  try {
+    if (busy) return { error: { key: 'proxyBusy' } };
+    proxy.set(on ? url : '');
+    closeAll();
+    fs.writeFileSync(proxyFile, JSON.stringify({ url: String(url || '').trim() }));
+    return { ok: true, result: proxy.get() };
+  } catch (e) { return failure(e); }
+});
+ipcMain.handle('proxy-test', async () => { try { return { ok: true, result: await proxy.test() }; } catch (e) { return failure(e); } });
+ipcMain.handle('settings-get', () => ({ ok: true, result: { tray: settings.tray, autostart: app.isPackaged && app.getLoginItemSettings(loginOpts).openAtLogin } }));
+ipcMain.handle('settings-set', (_e, { tray: t, autostart }) => {
+  try {
+    settings.tray = !!t;
+    fs.writeFileSync(settingsFile, JSON.stringify(settings));
+    syncTray();
+    if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!autostart, ...loginOpts });
+    return { ok: true };
+  } catch (e) { return failure(e); }
+});
+// "from the start": the next search forgets where the stopped one was
+ipcMain.handle('hunt-reset', () => { try { fs.rmSync(path.join(dir, FILES.resume), { force: true }); return { ok: true }; } catch (e) { return failure(e); } });
+ipcMain.handle('start', noProxy(op(afterSwap(runSwap))));
 // everything the fast swap logs goes to a file next to the exe as well, with the final result
 let fastRun = []; // the lines of the last fast swap, for the Log button
 const fastFile = (line) => { const l = new Date().toISOString() + ' ' + line; fastRun.push(l); try { fs.appendFileSync(path.join(dir, 'fastswap-log.txt'), l + '\n'); } catch {} };
 ipcMain.handle('fast-log', () => fastRun.join('\n'));
-ipcMain.handle('start-fast', op(afterSwap(async (cfg, io) => {
+ipcMain.handle('start-fast', noProxy(op(afterSwap(async (cfg, io) => {
   fastRun = [];
   fastFile('--- fast swap, offset ' + cfg.offset + ' ms');
   try {
@@ -104,8 +158,8 @@ ipcMain.handle('start-fast', op(afterSwap(async (cfg, io) => {
     fastFile('RESULT ok');
     return r;
   } catch (e) { fastFile('RESULT error ' + (e.key || '') + ' ' + e.message + (e.p ? ' ' + JSON.stringify(e.p) : '')); throw e; }
-})));
-ipcMain.handle('load-ids', op(loadIds));
+}))));
+ipcMain.handle('load-ids', noProxy(op(loadIds)));
 // the search uses the accounts ticked in the manager; what it learns about them (own ID) is stored back
 ipcMain.handle('hunt', op((cfg, io) => runHunt({ ...cfg, logins: acc.selected(dir) }, {
   ...io,
@@ -154,8 +208,8 @@ ipcMain.handle('acc-add-file', async () => {
   } catch (e) { return failure(e); }
 });
 // only the accounts ticked in the manager are checked
-ipcMain.handle('acc-refresh', op((_cfg, io) => acc.refresh(dir, acc.toCheck(dir), io), false));
-ipcMain.handle('acc-clear', op((cfg, io) => acc.clearId(dir, cfg, io), false));
+ipcMain.handle('acc-refresh', noProxy(op((_cfg, io) => acc.refresh(dir, acc.toCheck(dir), io), false)));
+ipcMain.handle('acc-clear', noProxy(op((cfg, io) => acc.clearId(dir, cfg, io), false)));
 ipcMain.on('hunt-tune', (_e, cfg) => tune(cfg)); // slider changes during a search
 ipcMain.handle('files-open', () => shell.openPath(dir));
 // open the list of IDs or the found ones in the default editor; a file the user deleted is made again first

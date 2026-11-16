@@ -6,7 +6,9 @@ Portable Windows app (Electron) for managing Steam custom profile URLs (`steamco
 
 - **Swapper** – transfers a custom ID from account 1 to account 2 as fast as possible; validation checks run only after the swap so nothing slows it down. **Fast swap** sends the claim on account 2 right after the temporary ID request, without waiting for its answer (the ID on account 1 should not have been changed for at least an hour).
 - **Account manager** – reads accounts from `accounts.txt`, fetches each account's SteamID64 and current custom ID, and exports/imports an encrypted config (`.vsa`).
-- **Free ID search** – checks IDs from `ids.txt`, saves available ones to `available.txt`, and claims them with the next account that doesn't have a custom ID yet (`claimed.txt` logs who took what).
+- **Free ID search** – checks IDs from `ids.txt`, saves available ones to `available.txt`, and claims them with the next account that doesn't have a custom ID yet (`claimed.txt` logs who took what). Stop remembers the ID it stopped at and the next start continues from there (**From the start** resets it).
+- **Proxy** – sends the ID search through a SOCKS5/HTTP proxy, e.g. local Cloudflare WARP.
+- **Settings** – a draggable mascot button opens a panel: language, theme, minimize to tray on close, start with the system, update check on start, Help and links.
 
 UI languages: English (default) and Russian.
 
@@ -20,6 +22,8 @@ UI languages: English (default) and Russian.
 
 ![Free ID search](docs/search.png)
 
+![Proxy](docs/proxy.png)
+
 ## Usage
 
 Grab `IDManager-for-Steam.exe` from the [Releases](https://github.com/idLorem/IDManager-for-Steam/releases/latest) page and run it – no installer needed. Next to the executable, it creates:
@@ -31,11 +35,25 @@ Grab `IDManager-for-Steam.exe` from the [Releases](https://github.com/idLorem/ID
 | `ids.txt` | IDs to check (one per line or comma-separated; case-sensitive) |
 | `available.txt` | Free IDs found during search |
 | `claimed.txt` | `ID:login` log of claimed IDs |
+| `hunt-progress.json` | The ID a stopped search was on |
+| `proxy.json` | The proxy address (the proxy itself is off after a restart) |
+| `settings.json` | Minimize to tray on close |
+| `fastswap-log.txt` | Log of every fast swap |
 
 Credentials entered into the Swapper card stay in RAM only and are never written to disk.
 Config exports are encrypted with AES-256-GCM (scrypt-derived key); the password must be 5+ characters with at least one digit and one uppercase letter.
 
 Windows SmartScreen or your antivirus may flag the `.exe` because it isn't code-signed.
+
+### Settings
+
+Click the mascot in the corner (drag it anywhere in the window) to open the settings: language, theme, **minimize to tray on close** (the search keeps running in the tray), **start with the system**, update check on start, Help and links. Only one copy of the program runs at a time.
+
+![Settings](docs/settings.png)
+
+### Proxy
+
+The Proxy card routes the ID search through a proxy. While it is on, the swap and the account manager are unavailable; after a restart it is off and only the address is kept. For Cloudflare WARP run `warp-cli mode proxy` and enter `socks5://127.0.0.1:40000`; `Check` shows the address Cloudflare sees. HTTP proxies (`http://host:port`) work too. If the proxy stops answering, the search continues without it and asks the proxy again every 5 minutes. Program update checks go directly.
 
 ## Build
 
@@ -70,7 +88,9 @@ MIT, see [LICENSE](LICENSE).
 
 - **Swapper** – максимально быстро перекидывает кастомный ID с первого аккаунта на второй; все проверки идут уже после переноса, чтобы не терять время. **Быстрый обмен** отправляет захват на втором аккаунте сразу после запроса временного ID, не дожидаясь ответа (ID на аккаунте 1 не должен меняться минимум час).
 - **Менеджер аккаунтов** – держит базу в `accounts.txt`, подтягивает SteamID64 и текущий ID, экспортирует и импортирует зашифрованный конфиг (`.vsa`).
-- **Поиск свободных ID** – прогоняет список из `ids.txt`, свободные складывает в `available.txt` и занимает следующим аккаунтом без своего ID (`claimed.txt` – лог того, кто что забрал).
+- **Поиск свободных ID** – прогоняет список из `ids.txt`, свободные складывает в `available.txt` и занимает следующим аккаунтом без своего ID (`claimed.txt` – лог того, кто что забрал). Stop запоминает ID, на котором остановились, и следующий запуск продолжает с него («С начала» сбрасывает позицию).
+- **Прокси** – направляет поиск ID через SOCKS5/HTTP-прокси, например локальный Cloudflare WARP.
+- **Настройки** – кнопка-маскот (её можно перетащить) открывает панель: язык, тема, сворачивание в трей при закрытии, запуск вместе с системой, проверка обновлений при старте, справка и ссылки.
 
 Интерфейс на английском (по умолчанию) и русском. Скриншоты – [выше](#screenshots).
 
@@ -78,7 +98,15 @@ MIT, see [LICENSE](LICENSE).
 
 ## Использование
 
-Скачайте `IDManager-for-Steam.exe` из [Releases](https://github.com/idLorem/IDManager-for-Steam/releases/latest) и запустите – установка не нужна. Рядом с `.exe` появятся рабочие файлы (`accounts.txt`, `accounts_info.json`, `ids.txt`, `available.txt`, `claimed.txt`); `accounts.txt` лежит в открытом виде, никому его не скидывайте. Данные аккаунтов 1 и 2 из карточки Swapper на диск не пишутся и живут только в оперативной памяти. Пароль от конфига: от 5 символов, с цифрой и заглавной буквой. SmartScreen и антивирусы могут ругаться, так как у `.exe` нет цифровой подписи.
+Скачайте `IDManager-for-Steam.exe` из [Releases](https://github.com/idLorem/IDManager-for-Steam/releases/latest) и запустите – установка не нужна. Рядом с `.exe` появятся рабочие файлы (`accounts.txt`, `accounts_info.json`, `ids.txt`, `available.txt`, `claimed.txt`, а также `hunt-progress.json`, `proxy.json`, `settings.json` и `fastswap-log.txt`); `accounts.txt` лежит в открытом виде, никому его не скидывайте. Данные аккаунтов 1 и 2 из карточки Swapper на диск не пишутся и живут только в оперативной памяти. Пароль от конфига: от 5 символов, с цифрой и заглавной буквой. SmartScreen и антивирусы могут ругаться, так как у `.exe` нет цифровой подписи.
+
+### Настройки
+
+Клик по маскоту в углу (его можно перетащить в любое место окна) открывает настройки: язык, тема, **сворачивание в трей при закрытии** (поиск продолжает работать в трее), **запуск вместе с системой**, проверка обновлений при старте, справка и ссылки. Одновременно работает только одна копия программы.
+
+### Прокси
+
+Карточка «Прокси» направляет поиск ID через прокси. Пока он включён, обмен и менеджер аккаунтов недоступны; после перезапуска прокси выключен, сохраняется только адрес. Для Cloudflare WARP выполните `warp-cli mode proxy` и укажите `socks5://127.0.0.1:40000`; «Проверить» покажет адрес, который видит Cloudflare. HTTP-прокси (`http://host:port`) тоже подходят. Если прокси перестал отвечать, поиск продолжается без него и раз в 5 минут проверяет, вернулся ли он. Проверка обновлений идёт напрямую.
 
 ## Сборка
 

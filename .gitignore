@@ -6,7 +6,11 @@ builder-debug.yml
 # personal data: never commit
 accounts*.txt
 accounts_info.json
+proxy.json
 claimed.txt
+fastswap-log.txt
+hunt-progress.json
+settings.json
 available.txt
 ids*.txt
 words*.txt

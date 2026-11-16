@@ -1,15 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 const swap = require('./swap');
+const proxy = require('./proxy');
 const { loadAccounts, list: listAccounts, rateLimited, HEADER } = require('./accounts');
 
 // Files live next to the program: ids.txt (what to look for), available.txt (free IDs found),
 // accounts.txt (login:password[:shared_secret]) and claimed.txt (which account took which ID).
-const FILES = { ids: 'ids.txt', available: 'available.txt', accounts: 'accounts.txt', claimed: 'claimed.txt' };
+const FILES = { ids: 'ids.txt', available: 'available.txt', accounts: 'accounts.txt', claimed: 'claimed.txt', resume: 'hunt-progress.json' }; // resume: the ID a stopped search was on
 const ID_RE = /^[A-Za-z0-9_-]{3,32}$/; // Steam custom URL: 3-32 chars; the case is kept exactly as typed
 // shortcut: one request at a time, about 1.5 per second (Steam answers 429 faster than that); raise only if lists get huge
 // stale: swap.js closes sessions after 10 minutes, so a ready account older than this is logged in again before it claims
-const timing = { gap: 667, maxGap: 8000, timeout: 8000, tries: 2, rateWait: 5000, retryWait: 600, stale: 8 * 60 * 1000, cooldown: 10 * 60 * 1000, perId: 3, loginPause: 60 * 1000 };
+const timing = { gap: 667, maxGap: 8000, timeout: 8000, tries: 2, rateWait: 5000, retryWait: 600, stale: 8 * 60 * 1000, cooldown: 10 * 60 * 1000, perId: 3, loginPause: 60 * 1000, netFails: 5, proxyProbe: 5 * 60 * 1000 };
+// netFails: this many requests in a row without any answer mean the proxy is dead; proxyProbe: how often a dead proxy is asked again while the search goes on without it
 // loginPause: after Steam limits sign-ins, no new sign-in is tried for this long
 // cooldown: Steam refuses an ID change on an account that changed it recently, so that account rests this long; perId: accounts tried for one ID
 const COOLDOWN_RE = /error occurred while setting account details/i;
@@ -34,7 +36,7 @@ const clean = (c = {}) => {
 };
 let cur = { ...timing };
 const tune = (c) => Object.assign(cur, clean(c));
-let stop = false, nextAt = 0, gap = cur.gap, calm = true; // gap: the pause between requests. It doubles on a 429 that follows a good answer (calm), not on repeated 429s in a row, and shrinks back
+let netFails = 0, stop = false, nextAt = 0, gap = cur.gap, calm = true; // gap: the pause between requests. It doubles on a 429 that follows a good answer (calm), not on repeated 429s in a row, and shrinks back
 // waits in small steps so the Stop button works during long pauses
 async function wait(ms) { for (let t = 0; t < ms && !stop; t += 250) await sleep(Math.min(250, ms - t)); }
 async function throttle() {
@@ -57,7 +59,12 @@ async function check(id, deps, log) {
     let res;
     try {
       res = await deps.fetch('https://steamcommunity.com/id/' + id + '/', { headers: HEADERS, signal: AbortSignal.timeout(cur.timeout) });
-    } catch { await wait(cur.retryWait); continue; }
+    } catch {
+      // no answer at all: a proxy that keeps failing is given up, the search goes on without it (unless the proxy itself still answers: then Steam is slow)
+      if (++netFails >= cur.netFails && proxy.live()) { netFails = 0; if (!(await deps.ping())) { proxy.setDown(true); log('proxyDown'); } }
+      await wait(cur.retryWait); continue;
+    }
+    netFails = 0;
     if (res.status === 429) {
       const after = Number(res.headers.get('retry-after')) * 1000;
       const ms = Math.min(after || cur.rateWait * (i + 1), 300000);
@@ -93,13 +100,16 @@ function readIds(dir) {
 
 // Looks for free IDs from ids.txt; each free one is saved to available.txt and taken by the next
 // unused account from accounts.txt. An account that already has a custom ID is skipped (it would lose it).
-async function runHunt(cfg, { log, progress = () => {}, dir, askCode = noGuard }, L = swap.libs(), deps = { fetch }) {
+async function runHunt(cfg, { log, progress = () => {}, dir, askCode = noGuard }, L = swap.libs(), deps = { fetch: proxy.search, ping: proxy.ping }) {
   cur = { ...timing, ...clean(cfg) };
-  stop = false; nextAt = 0; gap = cur.gap; calm = true;
+  stop = false; nextAt = 0; gap = cur.gap; calm = true; netFails = 0;
   const f = (k) => path.join(dir, FILES[k]);
   const { todo, bad } = readIds(dir);
   if (bad) log('badIds', { n: bad });
   if (!todo.length) throw Object.assign(new Error('no IDs to check'), { key: 'noIds' });
+  // after Stop the next run goes on from the ID it stopped at (if that ID is still in the list)
+  let from = 0;
+  try { const r = JSON.parse(fs.readFileSync(f('resume'), 'utf8')); from = Math.max(0, todo.indexOf(r.id)); if (from) log('huntResume', { id: r.id, n: from }); } catch {}
 
   // cfg.logins: the accounts chosen in the manager; without it every account of accounts.txt is used
   const loaded = loadAccounts(dir);
@@ -136,11 +146,18 @@ async function runHunt(cfg, { log, progress = () => {}, dir, askCode = noGuard }
     return null;
   };
   let ready = prepareNext(); // the account waiting for the next find (a promise)
-  const st = { checked: 0, total: todo.length, found: 0, claimed: 0 };
+  const st = { checked: from, total: todo.length, found: 0, claimed: 0 };
+  let last = ''; // the ID being checked when Stop came
   try {
-    const queue2 = [...todo], again = new Set(); // IDs Steam did not answer clearly get one more try at the end
+    let probeAt = Date.now() + cur.proxyProbe;
+    const queue2 = todo.slice(from), again = new Set(); // IDs Steam did not answer clearly get one more try at the end
     for (const id of queue2) {
+      last = again.has(id) ? todo[todo.length - 1] : id; // in the second pass the first pass is over: only the end of the list is left
       if (stop) break;
+      if (proxy.get() && !proxy.live() && Date.now() >= probeAt) { // the proxy is down: asked again every few minutes
+        probeAt = Date.now() + cur.proxyProbe;
+        if (await deps.ping()) { proxy.setDown(false); netFails = 0; log('proxyBack'); }
+      }
       const r = await check(id, deps, log);
       if (r === 'stopped') break;
       if (r === 'unknown' && !again.has(id)) { again.add(id); queue2.push(id); continue; }
@@ -153,7 +170,7 @@ async function runHunt(cfg, { log, progress = () => {}, dir, askCode = noGuard }
         for (let tried = 0; tried < cur.perId; tried++) { // the cooldown error moves the same ID to the next account
           let slot = await ready;
           if (!slot) { ready = prepareNext(); slot = await ready; } // an account may have finished resting meanwhile
-          if (slot && Date.now() - slot.s.at > cur.stale) { // it waited long, its session may be closed
+          if (slot && (slot.s.px !== proxy.live() || Date.now() - slot.s.at > cur.stale)) { // it waited long (its session may be closed) or the proxy went down or came back: it logs in again the other way
             swap.drop(slot.acc); queue.unshift(slot.acc);
             ready = prepareNext(); slot = await ready;
           }
@@ -184,7 +201,9 @@ async function runHunt(cfg, { log, progress = () => {}, dir, askCode = noGuard }
     }
   } finally {
     ready.then((slot) => slot && swap.drop(slot.acc)); // do not wait: a slow login must not hold Stop
+    proxy.setDown(false); // the next operation tries the proxy again
   }
+  try { if (stop && last) fs.writeFileSync(f('resume'), JSON.stringify({ id: last })); else fs.rmSync(f('resume'), { force: true }); } catch {} // a finished search starts from the top next time
   log(stop ? 'huntStopped' : 'huntDone', st);
   return st;
 }

@@ -615,6 +615,55 @@ const cfg = { a1: { login: 'a', password: 'b' }, a2: { login: 'c', password: 'd'
   const stopped = await hunt.runHunt({}, hio, L, { fetch: async (u) => { hunt.stopHunt(); return fakeFetch(u); } });
   assert.strictEqual(stopped.checked, 1);
   assert.ok(hlogs.some(([k]) => k === 'huntStopped'));
+  // the next run goes on from the ID the stopped one was on, and a finished run forgets it
+  const rf = path.join(dir, 'hunt-progress.json');
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(rf, 'utf8')), { id: 'Bbb2' });
+  probed.length = 0; hlogs.length = 0;
+  const resumed = await hunt.runHunt({}, hio, L, { fetch: fakeFetch });
+  assert.deepStrictEqual(probed, ['Bbb2', 'Ccc3']);
+  assert.deepStrictEqual(resumed.checked, 3);
+  assert.ok(hlogs.some(([k, p]) => k === 'huntResume' && p.id === 'Bbb2' && p.n === 1));
+  assert.strictEqual(fs.existsSync(rf), false);
   fs.rmSync(dir, { recursive: true, force: true });
+  // proxy: address normalisation, options for steam-user, agent for steamcommunity
+  const px = require('./proxy');
+  assert.strictEqual(px.set('127.0.0.1:40000'), 'socks5h://127.0.0.1:40000');
+  assert.deepStrictEqual(px.userOpts(), { socksProxy: 'socks5h://127.0.0.1:40000' });
+  let pxSeen; px.useOn({ request: { defaults: (o) => { pxSeen = o; return "wrapped"; } } });
+  assert.ok(pxSeen.agent);
+  assert.deepStrictEqual((px.set('http://h:8080'), px.userOpts()), { httpProxy: 'http://h:8080' });
+  assert.throws(() => px.set('ftp://x:1'), (e) => e.key === 'proxyBad');
+  assert.strictEqual(px.set(''), '');
+  assert.deepStrictEqual(px.userOpts(), {});
+  // a session made without the proxy is not reused with it, and closeAll() empties the cache
+  const swapM = require('./swap');
+  let logons = 0;
+  const L2 = { ...L, SteamUser: class extends U { constructor(o) { super(o); logons++; } } };
+  const qa = { login: 'q', password: 'pw' };
+  await swapM.session(qa, 1, () => {}, async () => '0', L2); await swapM.session(qa, 1, () => {}, async () => '0', L2);
+  assert.strictEqual(logons, 1);
+  px.set('socks5://127.0.0.1:1'); await swapM.session(qa, 1, () => {}, async () => '0', L2);
+  assert.strictEqual(logons, 2); // the proxy came on: logs in again
+  swapM.closeAll(); await swapM.session(qa, 1, () => {}, async () => '0', L2);
+  assert.strictEqual(logons, 3);
+  swapM.drop(qa); px.set('');
+
+  // a dead proxy: the search goes on without it, asks it again later and goes back to it
+  const dirP = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-'));
+  fs.writeFileSync(path.join(dirP, 'ids.txt'), 'Aa1, Bb2, Cc3, Dd4');
+  fs.writeFileSync(path.join(dirP, 'accounts.txt'), '# none\n');
+  px.set('socks5://127.0.0.1:1');
+  Object.assign(hunt.timing, { netFails: 2, proxyProbe: 0 });
+  let dead = true, pings = 0;
+  const plogs = [], through = [];
+  await hunt.runHunt({}, { log: (k) => plogs.push(k), dir: dirP }, L, {
+    fetch: async () => { through.push(px.live()); if (px.live() && dead) throw new Error('refused'); return { status: 200, headers: { get: () => null }, text: async () => '<div class="profile_header"></div>' }; },
+    ping: async () => { if (++pings >= 2) { dead = false; return true; } return false; },
+  });
+  assert.deepStrictEqual(plogs.filter((k) => k.startsWith('proxy')), ['proxyDown', 'proxyBack']);
+  assert.ok(through.includes(false) && through[through.length - 1] === true); // some requests went direct, the last through the proxy again
+  assert.strictEqual(px.live(), true); // down is reset at the end of the run
+  px.set(''); Object.assign(hunt.timing, { netFails: 5, proxyProbe: 5 * 60 * 1000 });
+  fs.rmSync(dirP, { recursive: true, force: true });
   console.log('ok');
 })().catch((e) => { console.error(e); process.exit(1); });

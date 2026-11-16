@@ -1,5 +1,6 @@
 const SteamTotp = require('steam-totp');
 const cheerio = require('cheerio');
+const proxy = require('./proxy');
 
 // log(key, params) emits message keys; the UI translates them (RU/EN).
 const libs = () => ({ SteamUser: require('steam-user'), SteamCommunity: require('steamcommunity'), SteamTotp });
@@ -22,8 +23,9 @@ async function pace() {
 // Logs one account in and resolves once its web session (cookies) is ready.
 function login(acc, n, log, askCode, L) {
   return new Promise((resolve, reject) => {
-    const user = new L.SteamUser();
-    const community = new L.SteamCommunity();
+    const px = proxy.live(); // read once: the login is built this way, whatever the proxy does while it runs
+    const user = new L.SteamUser(proxy.userOpts());
+    const community = proxy.useOn(new L.SteamCommunity());
     // steam-user reconnects forever when Steam is unreachable, so without a limit the UI would hang
     const timer = setTimeout(() => fail(Object.assign(new Error('login timeout'), { key: 'loginTimeout', p: { n } })), timing.loginTimeout);
     let settled = false; // a Steam Guard answer that arrives after the login has ended must not start a new logon
@@ -44,7 +46,7 @@ function login(acc, n, log, askCode, L) {
       clearTimeout(timer);
       community.setCookies(cookies);
       log('session', { n });
-      resolve({ user, community });
+      resolve({ user, community, px }); // px: how it logged in; a session made the other way is not reused
     });
     const opts = { accountName: acc.login, password: acc.password };
     if (acc.secret) opts.twoFactorCode = L.SteamTotp.generateAuthCode(acc.secret);
@@ -65,7 +67,7 @@ function drop(acc) {
 
 async function session(acc, n, log, askCode, L) {
   const hit = cache.get(keyOf(acc));
-  if (hit && Date.now() - hit.at < TTL) { log('session', { n }); return hit; }
+  if (hit && hit.px === proxy.live() && Date.now() - hit.at < TTL) { log('session', { n }); return hit; }
   drop(acc);
   const s = await login(acc, n, log, askCode, L);
   s.at = Date.now();
@@ -77,7 +79,7 @@ async function session(acc, n, log, askCode, L) {
   return s;
 }
 
-const closeAll = () => [...cache.values()].forEach((s) => { try { s.user.logOff(); } catch {} });
+const closeAll = () => { [...cache.values()].forEach((s) => { try { s.user.logOff(); } catch {} }); cache.clear(); };
 
 const cleanId = (v) => String(v || '').replace(/^.*\/id\//, '').replace(/\//g, '');
 
