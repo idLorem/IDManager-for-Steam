@@ -271,6 +271,7 @@ textarea:hover{border-color:var(--line2)}textarea:focus-visible{outline:2px soli
     <div><label for="rGap"><span data-i="sGap"></span><b id="vGap"></b></label><input type="range" id="rGap" min="2" max="100" step="1" value="60"></div>
     <div><label for="rTimeout"><span data-i="sTimeout"></span><b id="vTimeout"></b></label><input type="range" id="rTimeout" min="2" max="60" step="1" value="8"></div>
     <div><label for="rRate"><span data-i="sRate"></span><b id="vRate"></b></label><input type="range" id="rRate" min="1" max="120" step="1" value="5"></div>
+    <div><label for="rSwap"><span data-i="sSwap"></span><b id="vSwap"></b></label><input type="range" id="rSwap" min="0" max="20" step="1" value="0"></div>
   </div>
   <p class="hint" data-i="sHint" style="margin:-8px 0 16px"></p>
   <div class="bar"><button class="btn" id="hunt"></button><button class="btn sec sm" id="openFound" data-i="huntFound"></button><button class="btn sec sm" id="openClaimed" data-i="huntClaimed"></button><button class="btn sec sm" id="huntReset" data-i="huntReset"></button><p data-i="huntHint"></p></div>
@@ -346,11 +347,11 @@ ru:{title:'Manager',menuTitle:'Настройки',menuTray:'Сворачива�
   huntManual:'Аккаунтов без shared_secret, у которых есть Steam Guard: {n}. Для них код придётся вводить вручную (2 минуты на ответ)',huntProg:'Проверено {checked} из {total}, свободных {found}, занято {claimed}',huntLive:'Поиск идёт: проверено {checked} из {total}, свободных {found}, занято {claimed}',
   noIds:'В ids.txt нет ID для проверки (3–32 символа: латинские буквы, цифры, «_», «-») или все уже заняты по claimed.txt',
   badIds:'Пропущено неверных ID в ids.txt: {n}',badAccounts:'Пропущено неверных строк в accounts.txt: {n} (нужен формат login:password)',
-  huntStart:'Проверяю ID: {t}, аккаунтов: {a}',huntWait:'Steam просит подождать (429), пауза {s} с, интервал между запросами теперь {g} с',huntUnknown:'«{id}»: ответ Steam неясен, пропущен',
+  huntStart:'Проверяю ID: {t}, аккаунтов: {a}',huntSwap:'Вошёл в другой аккаунт: {login}',huntWait:'Steam просит подождать (429), пауза {s} с, интервал между запросами теперь {g} с',huntUnknown:'«{id}»: ответ Steam неясен, пропущен',
   found:'Свободен: «{id}»',noSpare:'«{id}»: записан в available.txt, но свободного аккаунта для него нет',
   accHasId:'Аккаунт {login}: уже есть свой ID «{id}», пропущен (он бы его потерял)',accFail:'Аккаунт {login}: не удалось подготовить ({msg}), пропущен',
   claimed:'«{id}» занят аккаунтом {login}',claimFail:'«{id}»: аккаунт {login} не смог занять ID ({msg})',accCooldown:'Аккаунт {login} в таймауте на смену ID, отдыхает {m} мин, «ID» пробует следующий аккаунт',
-  unit:'с',sGap:'Пауза между проверками',sTimeout:'Таймаут запроса',sRate:'Пауза после 429',
+  unit:'с',sGap:'Пауза между проверками',sTimeout:'Таймаут запроса',sRate:'Пауза после 429',sSwap:'Сменить аккаунт после 429',swapOff:'нет',
   sHint:'Ползунки работают и во время поиска. После 429 пауза между проверками сама растёт от выбранной и потом возвращается к ней',
   fileFail:'Не удалось записать в {file} ({msg}). Добавьте строку вручную: {line}',
   mgrTitle:'Менеджер аккаунтов',mgrCap:'Аккаунты хранятся в accounts.txt. Отметьте, какие использовать в поиске и в проверке (Shift+клик — отметить диапазон). Клик по аккаунту показывает его пароль. «Проверить» входит в отмеченные аккаунты и узнаёт SteamID64 и свой ID',
@@ -404,11 +405,11 @@ en:{title:'Manager',menuTitle:'Settings',menuTray:'Minimize to tray on close',me
   huntManual:'Accounts without a shared_secret that have Steam Guard: {n}. Their code has to be typed by hand (2 minutes to answer)',huntProg:'Checked {checked} of {total}, free {found}, claimed {claimed}',huntLive:'Search is running: checked {checked} of {total}, free {found}, claimed {claimed}',
   noIds:'ids.txt has no IDs to check (3–32 Latin letters, digits, “_” or “-”), or all are already in claimed.txt',
   badIds:'Invalid IDs skipped in ids.txt: {n}',badAccounts:'Invalid lines skipped in accounts.txt: {n} (use login:password)',
-  huntStart:'Checking IDs: {t}, accounts: {a}',huntWait:'Steam asks to wait (429), pausing {s} s, the pause between requests is now {g} s',huntUnknown:'“{id}”: unclear Steam answer, skipped',
+  huntStart:'Checking IDs: {t}, accounts: {a}',huntSwap:'Signed in with another account: {login}',huntWait:'Steam asks to wait (429), pausing {s} s, the pause between requests is now {g} s',huntUnknown:'“{id}”: unclear Steam answer, skipped',
   found:'Free: “{id}”',noSpare:'“{id}”: saved to available.txt, but no spare account is left for it',
   accHasId:'Account {login}: already has the custom ID “{id}”, skipped (it would lose it)',accFail:'Account {login}: could not be prepared ({msg}), skipped',
   claimed:'“{id}” claimed by account {login}',claimFail:'“{id}”: account {login} could not claim the ID ({msg})',accCooldown:'Account {login} is in its ID-change cooldown, resting {m} min, the ID goes to the next account',
-  unit:'s',sGap:'Pause between checks',sTimeout:'Request timeout',sRate:'Pause after a 429',
+  unit:'s',sGap:'Pause between checks',sTimeout:'Request timeout',sRate:'Pause after a 429',sSwap:'Switch account after 429s',swapOff:'never',
   sHint:'The sliders also work during a search. After a 429 the pause between checks grows by itself from the chosen one, then returns to it',
   fileFail:'Could not write to {file} ({msg}). Add the line by hand: {line}',
   mgrTitle:'Account manager',mgrCap:'Accounts are kept in accounts.txt. Tick the ones to use in the search and in the check (Shift+click ticks a range). Click an account to see its password. “Check” signs in to the ticked accounts and reads their SteamID64 and custom ID',
@@ -635,18 +636,19 @@ $('fastOff').onchange=()=>{if(!(+$('fastOff').value>=80))$('fastOff').value=80};
 $('go').onclick=runSwapUi(false);$('fast').onclick=runSwapUi(true);
 // sliders: base pause between checks (tenths of a second), request timeout and first pause after a 429 (seconds); saved, and live during a run
 const tuneKey='tune';
-const tune=()=>({gap:$('rGap').value*100,timeout:$('rTimeout').value*1000,rateWait:$('rRate').value*1000});
+const tune=()=>({gap:$('rGap').value*100,timeout:$('rTimeout').value*1000,rateWait:$('rRate').value*1000,swapAfter:+$('rSwap').value});
 function showTune(){
   $('vGap').textContent=($('rGap').value/10).toFixed(1)+' '+t('unit');
   $('vTimeout').textContent=$('rTimeout').value+' '+t('unit');
   $('vRate').textContent=$('rRate').value+' '+t('unit');
-  ['rGap','rTimeout','rRate'].forEach(k=>{const e=$(k);e.style.setProperty('--p',(e.value-e.min)/(e.max-e.min)*100+'%')}); // fills the track up to the thumb
+  $('vSwap').textContent=+$('rSwap').value?$('rSwap').value:t('swapOff');
+  ['rGap','rTimeout','rRate','rSwap'].forEach(k=>{const e=$(k);e.style.setProperty('--p',(e.value-e.min)/(e.max-e.min)*100+'%')}); // fills the track up to the thumb
   showEst();
 }
-try{const v=JSON.parse(localStorage.getItem(tuneKey));if(v)['rGap','rTimeout','rRate'].forEach(k=>{if(Number.isFinite(+v[k]))$(k).value=v[k]})}catch{}
-['rGap','rTimeout','rRate'].forEach(k=>$(k).addEventListener('input',()=>{
+try{const v=JSON.parse(localStorage.getItem(tuneKey));if(v)['rGap','rTimeout','rRate','rSwap'].forEach(k=>{if(Number.isFinite(+v[k]))$(k).value=v[k]})}catch{}
+['rGap','rTimeout','rRate','rSwap'].forEach(k=>$(k).addEventListener('input',()=>{
   showTune();
-  try{localStorage.setItem(tuneKey,JSON.stringify({rGap:$('rGap').value,rTimeout:$('rTimeout').value,rRate:$('rRate').value}))}catch{}
+  try{localStorage.setItem(tuneKey,JSON.stringify({rGap:$('rGap').value,rTimeout:$('rTimeout').value,rRate:$('rRate').value,rSwap:$('rSwap').value}))}catch{}
   api.tuneHunt(tune());
 }));
 let spd=[]; // [time, checked] of the last 15 minutes of a running search: the real speed, 429 pauses included

@@ -10,7 +10,7 @@ const FILES = { ids: 'ids.txt', available: 'available.txt', accounts: 'accounts.
 const ID_RE = /^[A-Za-z0-9_-]{3,32}$/; // Steam custom URL: 3-32 chars; the case is kept exactly as typed
 // shortcut: one request at a time, about 1.5 per second (Steam answers 429 faster than that); raise only if lists get huge
 // stale: swap.js closes sessions after 10 minutes, so a ready account older than this is logged in again before it claims
-const timing = { gap: 667, maxGap: 8000, timeout: 8000, tries: 2, rateWait: 5000, retryWait: 600, stale: 8 * 60 * 1000, cooldown: 10 * 60 * 1000, perId: 3, loginPause: 60 * 1000, netFails: 5, proxyProbe: 5 * 60 * 1000 };
+const timing = { gap: 667, maxGap: 8000, timeout: 8000, tries: 2, rateWait: 5000, swapAfter: 0, retryWait: 600, stale: 8 * 60 * 1000, cooldown: 10 * 60 * 1000, perId: 3, loginPause: 60 * 1000, netFails: 5, proxyProbe: 5 * 60 * 1000 };
 // netFails: this many requests in a row without any answer mean the proxy is dead; proxyProbe: how often a dead proxy is asked again while the search goes on without it
 // loginPause: after Steam limits sign-ins, no new sign-in is tried for this long
 // cooldown: Steam refuses an ID change on an account that changed it recently, so that account rests this long; perId: accounts tried for one ID
@@ -28,7 +28,7 @@ const TEMPLATES = {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // cur: the settings of the run in progress (timing plus the sliders); the sliders may change while it runs
-const RANGE = { gap: [200, 10000], timeout: [2000, 60000], rateWait: [1000, 120000] };
+const RANGE = { gap: [200, 10000], timeout: [2000, 60000], rateWait: [1000, 120000], swapAfter: [0, 20] }; // swapAfter: 429 answers before the next account logs in (0 = never)
 const clean = (c = {}) => {
   const o = {};
   for (const k in RANGE) { const v = Number(c[k]); if (c[k] != null && Number.isFinite(v)) o[k] = Math.min(RANGE[k][1], Math.max(RANGE[k][0], v)); }
@@ -36,7 +36,7 @@ const clean = (c = {}) => {
 };
 let cur = { ...timing };
 const tune = (c) => Object.assign(cur, clean(c));
-let netFails = 0, stop = false, nextAt = 0, gap = cur.gap, calm = true; // gap: the pause between requests. It doubles on a 429 that follows a good answer (calm), not on repeated 429s in a row, and shrinks back
+let n429 = 0, cookie = '', netFails = 0, stop = false, nextAt = 0, gap = cur.gap, calm = true; // gap: the pause between requests. It doubles on a 429 that follows a good answer (calm), not on repeated 429s in a row, and shrinks back
 // waits in small steps so the Stop button works during long pauses
 async function wait(ms) { for (let t = 0; t < ms && !stop; t += 250) await sleep(Math.min(250, ms - t)); }
 async function throttle() {
@@ -58,7 +58,7 @@ async function check(id, deps, log) {
     if (stop) return 'stopped';
     let res;
     try {
-      res = await deps.fetch('https://steamcommunity.com/id/' + id + '/', { headers: HEADERS, signal: AbortSignal.timeout(cur.timeout) });
+      res = await deps.fetch('https://steamcommunity.com/id/' + id + '/', { headers: cookie ? { ...HEADERS, Cookie: HEADERS.Cookie + '; ' + cookie } : HEADERS, signal: AbortSignal.timeout(cur.timeout) });
     } catch {
       // no answer at all: a proxy that keeps failing is given up, the search goes on without it (unless the proxy itself still answers: then Steam is slow)
       if (++netFails >= cur.netFails && proxy.live()) { netFails = 0; if (!(await deps.ping())) { proxy.setDown(true); log('proxyDown'); } }
@@ -66,6 +66,7 @@ async function check(id, deps, log) {
     }
     netFails = 0;
     if (res.status === 429) {
+      n429++;
       const after = Number(res.headers.get('retry-after')) * 1000;
       const ms = Math.min(after || cur.rateWait * (i + 1), 300000);
       if (calm) gap = Math.min(gap * 2, Math.max(cur.maxGap, cur.gap));
@@ -102,7 +103,7 @@ function readIds(dir) {
 // unused account from accounts.txt. An account that already has a custom ID is skipped (it would lose it).
 async function runHunt(cfg, { log, progress = () => {}, dir, askCode = noGuard }, L = swap.libs(), deps = { fetch: proxy.search, ping: proxy.ping }) {
   cur = { ...timing, ...clean(cfg) };
-  stop = false; nextAt = 0; gap = cur.gap; calm = true; netFails = 0;
+  stop = false; nextAt = 0; gap = cur.gap; calm = true; netFails = 0; n429 = 0; cookie = '';
   const f = (k) => path.join(dir, FILES[k]);
   const { todo, bad } = readIds(dir);
   if (bad) log('badIds', { n: bad });
@@ -157,6 +158,15 @@ async function runHunt(cfg, { log, progress = () => {}, dir, askCode = noGuard }
       if (proxy.get() && !proxy.live() && Date.now() >= probeAt) { // the proxy is down: asked again every few minutes
         probeAt = Date.now() + cur.proxyProbe;
         if (await deps.ping()) { proxy.setDown(false); netFails = 0; log('proxyBack'); }
+      }
+      if (cur.swapAfter && n429 >= cur.swapAfter) { // Steam keeps answering 429: the next account logs in and the checks go on with its session
+        n429 = 0;
+        const old = await ready;
+        if (old) { swap.drop(old.acc); queue.push(old.acc); }
+        ready = prepareNext();
+        const slot = await ready;
+        cookie = slot ? (slot.s.cookies || []).map((c) => c.split(';')[0]).join('; ') : '';
+        if (slot) log('huntSwap', { login: slot.acc.login });
       }
       const r = await check(id, deps, log);
       if (r === 'stopped') break;

@@ -46,7 +46,7 @@ function login(acc, n, log, askCode, L) {
       clearTimeout(timer);
       community.setCookies(cookies);
       log('session', { n });
-      resolve({ user, community, px }); // px: how it logged in; a session made the other way is not reused
+      resolve({ user, community, px, cookies }); // cookies: the hunt sends them with its checks // px: how it logged in; a session made the other way is not reused
     });
     const opts = { accountName: acc.login, password: acc.password };
     if (acc.secret) opts.twoFactorCode = L.SteamTotp.generateAuthCode(acc.secret);

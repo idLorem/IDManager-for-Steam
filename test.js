@@ -338,6 +338,15 @@ const cfg = { a1: { login: 'a', password: 'b' }, a2: { login: 'c', password: 'd'
   const waits = hlogs.filter(([k]) => k === 'huntWait').map(([, p]) => p);
   assert.deepStrictEqual(waits.map((p) => p.g), ['0.4', '0.8', '0.8']); // base 0.2 s: doubles on a 429 after a good answer, not on the repeated one
   assert.deepStrictEqual(waits.map((p) => p.s), [3, 3, 6]); // the 429 pause starts from the slider and grows with the attempt
+  // swapAfter: after that many 429s the next account logs in and its cookies go with the checks (0 = never)
+  const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-'));
+  fs.writeFileSync(path.join(dir2, 'ids.txt'), 'Swp1, Swp2, Swp3');
+  fs.writeFileSync(path.join(dir2, 'accounts.txt'), 'swa:pw\nswb:pw\n');
+  const heads = [], sw = [429, 200, 429, 200, 200];
+  hlogs.length = 0;
+  await hunt.runHunt({ swapAfter: 1 }, { log: (k, p) => hlogs.push([k, p]), dir: dir2 }, L, { fetch: async (u, o) => { heads.push(o.headers.Cookie); return { status: sw.shift(), headers: { get: () => null }, text: async () => 'profile_header' }; } });
+  assert.strictEqual(hlogs.filter(([k]) => k === 'huntSwap').length, 2); // one switch per 429
+  assert.ok(!/swa|swb/.test(heads[0]) && /swb/.test(heads[2])); // the first check is anonymous, later ones carry the new account's cookies
   hunt.timing.gap = 1;
 
   // a 200 page that is neither "not found" nor a profile is unclear, never "taken" or "free"
