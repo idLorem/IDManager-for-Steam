@@ -339,7 +339,7 @@ ru:{title:'Manager',menuTitle:'Настройки',menuTray:'Сворачива�
   done:'Готово: аккаунт 2 теперь владеет «{target}»',
   huntTitle:'Поиск свободных ID',huntIds:'Открыть список ID',huntCount:'Посчитать ID',huntFound:'Открыть найденные',huntClaimed:'Открыть занятые',mgrAddFile:'Добавить из файла',
   hSel:'Выбрано аккаунтов: {n} из {m}',hSelSkip:'Выбрано аккаунтов: {s} из {m}, в поиске: {n} (у остальных уже есть ID)',hCount:'ID для поиска: {n}',hBad:'неверных пропущено: {n}',hNone:'В ids.txt нет ID для поиска',
-  hTime:'Примерное время при паузе {g}: {d}',hTime429:'Пауза меньше 5 с: Steam будет отвечать ошибкой 429. Время при паузе {g}: {d}',unitH:'ч',unitM:'мин',huntOpen:'Открыть папку',huntRun:'Искать и занимать',huntStop:'Остановить',
+  hTime:'Примерное время при паузе {g}: {d}',hSpeed:'Скорость сейчас: {r} ID/ч, осталось около {d}',hTime429:'Пауза меньше 5 с: Steam будет отвечать ошибкой 429. Время при паузе {g}: {d}',unitH:'ч',unitM:'мин',huntOpen:'Открыть папку',huntRun:'Искать и занимать',huntStop:'Остановить',
   huntCap:'Проверяет ID из ids.txt, свободные записывает в available.txt и занимает аккаунтами, отмеченными в менеджере: один ID на аккаунт, регистр как в списке',
   huntHint:'Нужны аккаунты без своего ID. Пароли лежат в accounts.txt открытым текстом, не передавайте файл',
   huntConfirm:'Искать ID из ids.txt и занимать найденные выбранными аккаунтами ({n})?',
@@ -397,7 +397,7 @@ en:{title:'Manager',menuTitle:'Settings',menuTray:'Minimize to tray on close',me
   done:'Done: account 2 now owns “{target}”',
   huntTitle:'Free ID search',huntIds:'Open ID list',huntCount:'Count IDs',huntFound:'Open found',huntClaimed:'Open claimed',mgrAddFile:'Add from file',
   hSel:'Accounts selected: {n} of {m}',hSelSkip:'Accounts selected: {s} of {m}, in the search: {n} (the others already have an ID)',hCount:'IDs to search: {n}',hBad:'invalid skipped: {n}',hNone:'ids.txt has no IDs to search',
-  hTime:'Estimated time at a pause of {g}: {d}',hTime429:'A pause under 5 s: Steam will answer with error 429. Time at a pause of {g}: {d}',unitH:'h',unitM:'min',huntOpen:'Open folder',huntRun:'Search and claim',huntStop:'Stop',
+  hTime:'Estimated time at a pause of {g}: {d}',hSpeed:'Speed now: {r} IDs/h, about {d} left',hTime429:'A pause under 5 s: Steam will answer with error 429. Time at a pause of {g}: {d}',unitH:'h',unitM:'min',huntOpen:'Open folder',huntRun:'Search and claim',huntStop:'Stop',
   huntCap:'Checks the IDs in ids.txt, saves free ones to available.txt and claims them with the accounts ticked in the manager: one ID per account, the case as listed',
   huntHint:'Accounts must have no custom ID. Passwords are in accounts.txt as plain text, do not share the file',
   huntConfirm:'Check the IDs in ids.txt and claim the free ones with the selected accounts ({n})?',
@@ -649,7 +649,19 @@ try{const v=JSON.parse(localStorage.getItem(tuneKey));if(v)['rGap','rTimeout','r
   try{localStorage.setItem(tuneKey,JSON.stringify({rGap:$('rGap').value,rTimeout:$('rTimeout').value,rRate:$('rRate').value}))}catch{}
   api.tuneHunt(tune());
 }));
-api.onProgress(st=>{prog=st;$('prog').textContent=t('huntProg',st);live(st)}); // not render(): it rebuilds the journal and scrolls it down
+let spd=[]; // [time, checked] of the last 15 minutes of a running search: the real speed, 429 pauses included
+function speedEst(st){
+  const now=Date.now();
+  if(spd.length&&st.checked<spd[spd.length-1][1])spd=[];
+  spd.push([now,st.checked]);
+  while(spd[0][0]<now-9e5)spd.shift();
+  const dt=(now-spd[0][0])/1000,dn=st.checked-spd[0][1];
+  if(dt<180||dn<=0)return; // too little data yet
+  const r=dn/dt;
+  $('hTime').textContent=t('hSpeed',{r:Math.round(r*3600),d:dur((st.total-st.checked)/r)});
+  $('hTime').className='';
+}
+api.onProgress(st=>{prog=st;$('prog').textContent=t('huntProg',st);live(st);if(hunting)speedEst(st)}); // not render(): it rebuilds the journal and scrolls it down
 const openF=async k=>{const r=await api.openFile(k);if(r&&r.error)accErr(r)};
 $('openIds').onclick=()=>openF('ids');
 // update check: GitHub's latest release against this version; a newer one opens its page (the user downloads the exe), nothing is replaced by itself
@@ -713,11 +725,11 @@ $('hunt').onclick=async()=>{
   if(hunting){api.stopHunt();return}
   const sel=accs.filter(a=>a.use&&!a.id),man=sel.filter(a=>a.guard&&!a.secret).length;
   if(!confirm([t('huntConfirm',{n:sel.length}),man&&t('huntManual',{n:man})].filter(Boolean).join('\n')))return;
-  reset();prog=null;hunting=true;lock(true);render();
+  reset();prog=null;spd=[];hunting=true;lock(true);render();
   const r=await api.hunt(tune());
   hunting=false;lock(false);
   if(r&&r.error)fail(r);
-  render();
+  render();showEst();
   loadAccs(); // a claim gives the account its ID
 };
 
