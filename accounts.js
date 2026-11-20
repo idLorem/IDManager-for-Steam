@@ -57,7 +57,7 @@ function list(dir) {
   const info = readInfo(dir);
   return loadAccounts(dir).accounts.map(({ login, secret }) => {
     const m = info[login] || {};
-    return { login, secret: !!secret, use: m.use !== false, steamId: m.steamId || '', id: m.id || '', guard: !!m.guard, err: m.err || '', stale: !!m.stale };
+    return { login, secret: !!secret, use: !!m.stale || m.use !== false, steamId: m.steamId || '', id: m.id || '', guard: !!m.guard, err: m.err || '', stale: !!m.stale };
   });
 }
 const selected = (dir) => list(dir).filter((a) => a.use && !a.stale).map((a) => a.login);
@@ -98,7 +98,7 @@ function remove(dir, logins) {
 // logins: which accounts, or null for all
 function setUse(dir, logins, use) {
   const info = readInfo(dir);
-  for (const { login } of loadAccounts(dir).accounts) if ((!logins || logins.includes(login)) && !(use && info[login] && info[login].stale)) info[login] = { ...info[login], use: !!use }; // a marked account stays unticked until it is checked
+  for (const { login } of loadAccounts(dir).accounts) if ((!logins || logins.includes(login)) && !(info[login] && info[login].stale)) info[login] = { ...info[login], use: !!use }; // a marked account stays ticked for the check until it is checked
   writeAtomic(path.join(dir, FILES.info), JSON.stringify(info, null, 1));
 }
 
@@ -203,4 +203,20 @@ async function clearId(dir, { login, id: expect }, { log, askCode }, L = swap.li
   } finally { swap.drop(acc); }
 }
 
-module.exports = { loadAccounts, parseLine, list, selected, toCheck, add, remove, setUse, patch, refresh, clearId, reveal, exportText, importText, rateLimited, stop: () => { stopped = true; wake(); }, timing, FILES, HEADER };
+// Sets the custom ID of one account by hand. Success only when the profile page shows the new ID afterwards.
+async function setOwnId(dir, { login, id }, { log, askCode }, L = swap.libs()) {
+  id = swap.cleanId(id);
+  if (!/^[A-Za-z0-9_-]{3,32}$/.test(id)) throw Object.assign(new Error('bad ID'), { key: 'badId', p: { id } });
+  const acc = loadAccounts(dir).accounts.find((a) => a.login === login);
+  if (!acc) throw Object.assign(new Error('unknown account'), { key: 'accMissing', p: { login } });
+  try {
+    const s = await swap.session(acc, login, log, askCode, L);
+    await swap.prepare(s, login, log);
+    if (s.edit.current !== id) await swap.setIdChecked(s, id);
+    patch(dir, login, { id });
+    log('idSet', { login, id });
+    return id;
+  } finally { swap.drop(acc); }
+}
+
+module.exports = { loadAccounts, parseLine, list, selected, toCheck, add, remove, setUse, patch, refresh, clearId, setOwnId, reveal, exportText, importText, rateLimited, stop: () => { stopped = true; wake(); }, timing, FILES, HEADER };

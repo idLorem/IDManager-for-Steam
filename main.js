@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog, clipboard, Tray, Menu, nativeImage } =require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, clipboard, Tray, Menu, nativeImage, Notification } =require('electron');
 const fs = require('fs');
 const path = require('path');
 const { runSwap, runFastSwap, loadIds, closeAll } = require('./swap');
@@ -30,6 +30,7 @@ const syncTray = () => {
   } else if (!settings.tray && tray) { tray.destroy(); tray = null; }
 };
 // one window: a second start (the exe again) brings the hidden one back instead of opening another copy
+app.setAppUserModelId('local.vanityswap'); // Windows shows notifications only for an app with an id
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 app.on('second-instance', showWin);
@@ -38,7 +39,7 @@ app.whenReady().then(() => {
   win = new BrowserWindow({
     show: !(settings.tray && process.argv.includes('--autostart')), // started by the system with the tray on: stays in the tray
     width: 960, height: 900, minWidth: 720, minHeight: 640,
-    autoHideMenuBar: true, backgroundColor: '#0b0b0c', icon: path.join(__dirname, 'build', 'icon.png'),
+    autoHideMenuBar: true, backgroundColor: '#202020', icon: path.join(__dirname, 'build', 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false }, // a long search must keep drawing when the window is covered or the remote session is locked
   });
   win.loadFile('index.html');
@@ -75,6 +76,16 @@ const newer = (a, b) => {
   for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
   return false;
 };
+// the Steam profile of an account from the manager: its custom ID, or its SteamID64 when it has none
+ipcMain.handle('open-profile', async (_e, login) => {
+  try {
+    const a = acc.list(dir).find((x) => x.login === login);
+    const url = a && (/^[A-Za-z0-9_-]{3,32}$/.test(a.id) ? 'https://steamcommunity.com/id/' + a.id + '/' : /^\d{17}$/.test(a.steamId) ? 'https://steamcommunity.com/profiles/' + a.steamId + '/' : '');
+    if (!url) return { error: { key: 'noLink' } };
+    await shell.openExternal(url);
+    return { ok: true };
+  } catch (e) { return failure(e); }
+});
 ipcMain.handle('app-info', () => ({ version: app.getVersion() }));
 ipcMain.handle('update-check', async () => {
   try {
@@ -100,6 +111,14 @@ const readProxy = () => { try { return String(JSON.parse(fs.readFileSync(proxyFi
 // swap and the account manager do not run through a proxy: one more address for the accounts could get them flagged
 const noProxy = (fn) => (e, a) => (proxy.get() ? { error: { key: 'proxyLocked' } } : fn(e, a));
 let busy = false;
+// history.txt next to the exe: date, what happened, ID, account (tab separated), newest at the end
+const HIST = 'history.txt';
+const record = (key, p, cfg) => {
+  const e = key === 'claimed' ? ['claimed', p.id, p.login] : key === 'done' ? ['swap', p.target, cfg && cfg.a2 && cfg.a2.login] : key === 'idSet' ? ['set', p.id, p.login] : key === 'idCleared' ? ['cleared', p.id, p.login] : null;
+  if (!e) return;
+  try { fs.appendFileSync(path.join(dir, HIST), [new Date().toISOString(), ...e.map((x) => String(x || ''))].join('\t') + '\n'); } catch {}
+  if (key === 'claimed' && Notification.isSupported()) new Notification({ title: 'IDManager for Steam', body: '/id/' + p.id + ' → ' + p.login }).show();
+};
 // Runs one operation at a time. Swap and load need both accounts filled in (needAccounts).
 const op = (fn, needAccounts = true) => async (_e, cfg) => {
   if (busy) return;
@@ -108,14 +127,14 @@ const op = (fn, needAccounts = true) => async (_e, cfg) => {
     if (![a1.login, a1.password, a2.login, a2.password].every(Boolean)) return { error: { key: 'fillAcc' } };
   }
   busy = true;
-  const log = (key, p) => win.webContents.send('log', key, p);
+  const log = (key, p) => { record(key, p, cfg); win.webContents.send('log', key, p); };
   try { return { ok: true, result: await fn(cfg, { log, askCode, dir, progress: (st) => win.webContents.send('progress', st) }) }; }
   catch (e) { return { error: { key: e.key, p: e.p, msg: e.message, acc: e.acc } }; }
   finally { askCode.cancel(); busy = false; } // a login still waiting for a code must not prompt after the end
 };
 
-// an account the program changed is unticked and marked in the manager: what is known about it is out of date
-const changed = (...logins) => { try { const known = acc.loadAccounts(dir).accounts.map((x) => x.login); for (const l of logins) if (known.includes(l)) acc.patch(dir, l, { use: false, stale: true }); } catch {} }; // only accounts of the manager (a login typed by hand is not in the list)
+// an account the program changed is marked in the manager and stays ticked for the check: what is known about it is out of date
+const changed = (...logins) => { try { const known = acc.loadAccounts(dir).accounts.map((x) => x.login); for (const l of logins) if (known.includes(l)) acc.patch(dir, l, { use: true, stale: true }); } catch {} }; // only accounts of the manager (a login typed by hand is not in the list)
 // marked once the checks passed, success or not: from then on the swap may have changed either account
 const afterSwap = (run) => async (cfg, io) => {
   let went = false;
@@ -210,6 +229,12 @@ ipcMain.handle('acc-add-file', async () => {
 // only the accounts ticked in the manager are checked
 ipcMain.handle('acc-refresh', noProxy(op((_cfg, io) => acc.refresh(dir, acc.toCheck(dir), io), false)));
 ipcMain.handle('acc-clear', noProxy(op((cfg, io) => acc.clearId(dir, cfg, io), false)));
+ipcMain.handle('acc-set-id', noProxy(op((cfg, io) => acc.setOwnId(dir, cfg, io), false)));
+// the last 300 entries of history.txt, newest first
+ipcMain.handle('history', quick(() => { try { return fs.readFileSync(path.join(dir, HIST), 'utf8').split('\n').filter(Boolean).slice(-300).reverse().map((l) => { const [at, kind, id, login] = l.split('\t'); return { at, kind, id, login }; }); } catch { return []; } }));
+ipcMain.handle('open-id', async (_e, id) => { try { if (!/^[A-Za-z0-9_-]{3,32}$/.test(id)) return { error: { key: 'noLink' } }; await shell.openExternal('https://steamcommunity.com/id/' + id + '/'); return { ok: true }; } catch (e) { return failure(e); } });
+// ids.txt dropped onto the window replaces the list (the window confirms first); a big file is refused
+ipcMain.handle('ids-set', quick((text) => { if (String(text).length > 5e6) throw new Error('file is too big for an ID list'); fs.writeFileSync(path.join(dir, 'ids.txt'), String(text), 'utf8'); fs.rmSync(path.join(dir, FILES.resume), { force: true }); const r = readIds(dir); return { n: r.todo.length, bad: r.bad }; }));
 ipcMain.on('hunt-tune', (_e, cfg) => tune(cfg)); // slider changes during a search
 ipcMain.handle('files-open', () => shell.openPath(dir));
 // open the list of IDs or the found ones in the default editor; a file the user deleted is made again first

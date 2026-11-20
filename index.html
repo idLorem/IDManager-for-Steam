@@ -4,39 +4,50 @@
 <title>IDManager for Steam</title>
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('theme')==='light'?'light':'dark'}catch{document.documentElement.dataset.theme='dark'}</script>
 <style>
-/* monochrome like the logo: neutral surfaces, the ink itself is the accent; only status colors carry hue */
+/* Windows 11 Fluent: layered neutral surfaces, one accent for primary actions and controls */
 :root{
   color-scheme:dark;
-  --bg:#0b0b0c;--card:#111113;--raised:#1b1b1e;--field:#0b0b0c;--hover:rgba(255,255,255,.045);
-  --line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.2);
-  --fg:#ededee;--fg2:#a4a4aa;--mut:#85858c;--on:#0b0b0c;
-  --pos:#4cc38a;--neg:#f2686c;
-  --shadow:0 16px 48px rgba(0,0,0,.5);
+  --bg:#202020;--card:#2b2b2b;--raised:#323232;--field:rgba(255,255,255,.06);--fieldf:#1f1f1f;--hover:rgba(255,255,255,.06);
+  --ctl:rgba(255,255,255,.06);--ctlh:rgba(255,255,255,.084);--ctla:rgba(255,255,255,.033);
+  --line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.16);--strong:rgba(255,255,255,.54);
+  --fg:#ffffff;--fg2:#c8c8c8;--mut:#9d9d9d;--on:#000000;
+  --acc:#60cdff;--acch:#5bbde9;--acca:#56a9d0;--onacc:#000000;--thumb:#454545;
+  --pos:#6ccb5f;--neg:#ff99a4;
+  --shadow:0 8px 32px rgba(0,0,0,.42);
   --ease:cubic-bezier(.22,1,.36,1);
   --sans:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
   --mono:"Cascadia Mono",Consolas,ui-monospace,monospace;
 }
 :root[data-theme=light]{
   color-scheme:light;
-  --bg:#f7f7f8;--card:#ffffff;--raised:#f0f0f1;--field:#fafafa;--hover:rgba(0,0,0,.04);
-  --line:rgba(0,0,0,.1);--line2:rgba(0,0,0,.24);
-  --fg:#0c0c0d;--fg2:#515157;--mut:#6c6c73;--on:#ffffff;
-  --pos:#157347;--neg:#c5333a;
-  --shadow:0 16px 48px rgba(0,0,0,.14);
+  --bg:#f3f3f3;--card:#fbfbfb;--raised:#f5f5f5;--field:rgba(255,255,255,.7);--fieldf:#ffffff;--hover:rgba(0,0,0,.037);
+  --ctl:rgba(255,255,255,.7);--ctlh:rgba(249,249,249,.5);--ctla:rgba(249,249,249,.3);
+  --line:rgba(0,0,0,.08);--line2:rgba(0,0,0,.16);--strong:rgba(0,0,0,.45);
+  --fg:#1b1b1b;--fg2:#5d5d5d;--mut:#6e6e6e;--on:#ffffff;
+  --acc:#005fb8;--acch:#1a6ec1;--acca:#3381c8;--onacc:#ffffff;--thumb:#ffffff;
+  --pos:#0f7b0f;--neg:#c42b1c;
+  --shadow:0 8px 32px rgba(0,0,0,.14);
 }
 *{box-sizing:border-box}
-html,body{height:100%}
+html{height:100%}body{min-height:100%}
+html{scroll-padding-top:100px}
 body{margin:0;background:var(--bg);color:var(--fg);font:14px/20px var(--sans);-webkit-font-smoothing:antialiased}
 ::-webkit-scrollbar{width:12px;height:12px}
 ::-webkit-scrollbar-thumb{background:var(--line2);border:4px solid transparent;border-radius:6px;background-clip:content-box}
 ::-webkit-scrollbar-corner{background:none}
-::selection{background:var(--fg);color:var(--on)}
-.app{max-width:880px;margin:0 auto;padding:32px 32px 64px;display:flex;flex-direction:column;gap:20px}
+::selection{background:var(--acc);color:var(--onacc)}
+.app{max-width:880px;margin:0 auto;padding:16px 32px 64px;display:flex;flex-direction:column;gap:20px}
 
 header{position:sticky;top:0;z-index:4;background:var(--bg);border-bottom:1px solid var(--line)}
-header .in{display:flex;align-items:center;justify-content:center;gap:16px;max-width:880px;height:64px;margin:0 auto;padding:0 32px}
-h1{display:flex;align-items:center;gap:12px;margin:0;font-size:20px;line-height:28px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
-.logo{flex:none;width:32px;height:32px;border-radius:8px;box-shadow:0 0 0 1px var(--line2)}
+header .in{display:flex;align-items:center;justify-content:center;gap:16px;max-width:880px;height:44px;margin:0 auto;padding:0 32px}
+h1{display:flex;align-items:center;gap:4px;margin:0;font-size:17px;line-height:24px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.logo{flex:none;width:24px;height:24px;border-radius:5px}
+/* sections menu under the logo: stays on top, the button of the section in view is marked */
+.tabs{display:flex;justify-content:center;gap:4px;max-width:880px;margin:0 auto;padding:0 32px 6px}
+.tabs button{position:relative;height:32px;padding:0 14px;border:0;border-radius:4px;background:none;color:var(--fg2);font:400 14px var(--sans);cursor:pointer;transition:background-color .1s var(--ease),color .1s var(--ease)}
+.tabs button:hover{background:var(--hover);color:var(--fg)}
+.tabs button.on{color:var(--fg);font-weight:600}
+.tabs button.on::after{content:"";position:absolute;left:50%;bottom:2px;width:16px;height:3px;margin-left:-8px;border-radius:2px;background:var(--acc)}
 #mascot{position:fixed;right:16px;bottom:16px;z-index:6;width:96px;height:96px;padding:0;border:0;background:none;cursor:pointer;transition:transform .25s var(--ease),bottom .2s var(--ease);animation:float 4s ease-in-out infinite}
 #mascot img{display:block;width:96px;height:96px;object-fit:cover;pointer-events:none;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
 #mascot{touch-action:none;user-select:none;-webkit-user-select:none}
@@ -45,7 +56,7 @@ h1{display:flex;align-items:center;gap:12px;margin:0;font-size:20px;line-height:
 #mascot:focus-visible{outline:2px solid var(--fg2);outline-offset:2px;border-radius:12px}
 #foot.show~#mascot{bottom:44px}#foot.show.open~#mascot{bottom:145px}
 @keyframes float{50%{translate:0 -5px}}
-#menu{position:fixed;left:0;top:0;z-index:6;width:300px;padding:16px;box-sizing:border-box;background:var(--card);border:1px solid var(--line2);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.35);transition:opacity .2s var(--ease),transform .25s cubic-bezier(.2,.9,.3,1.2),bottom .2s var(--ease)}
+#menu{position:fixed;left:0;top:0;z-index:6;width:300px;padding:16px;box-sizing:border-box;background:var(--card);border:1px solid var(--line2);border-radius:8px;box-shadow:var(--shadow);transition:opacity .2s var(--ease),transform .25s cubic-bezier(.2,.9,.3,1.2),bottom .2s var(--ease)}
 #menu[hidden]{display:block;visibility:hidden;opacity:0;transform:scale(.85) translateY(12px);pointer-events:none;transition:opacity .15s var(--ease),transform .15s var(--ease),visibility 0s .15s}
 .mrow{display:flex;align-items:center;justify-content:space-between;gap:12px;height:36px;font:500 13px var(--sans);color:var(--fg2)}
 .mrow .lang,.mrow .icon{margin:0}
@@ -54,12 +65,12 @@ label.mrow{cursor:pointer}
 .mlinks{display:flex;flex-direction:column;gap:2px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
 .mlinks .btn{justify-content:flex-start;text-align:left}
 @media (prefers-reduced-motion:reduce){#mascot{animation:none}#menu,#menu[hidden]{transition:none}}
-.lang{display:flex;gap:2px;margin-left:8px;padding:2px;border:1px solid var(--line);border-radius:8px}
-.lang button{width:36px;height:26px;border:0;border-radius:6px;background:none;color:var(--mut);font:500 12px var(--sans);cursor:pointer;transition:background-color .15s var(--ease),color .15s var(--ease)}
+.lang{display:flex;gap:2px;margin-left:8px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--ctl)}
+.lang button{width:36px;height:26px;border:0;border-radius:4px;background:none;color:var(--mut);font:500 12px var(--sans);cursor:pointer;transition:background-color .15s var(--ease),color .15s var(--ease)}
 .lang button:hover{color:var(--fg)}
-.lang button[aria-pressed=true]{background:var(--raised);color:var(--fg)}
-.icon{display:grid;place-items:center;width:32px;height:32px;margin-left:4px;padding:0;border:1px solid var(--line);border-radius:8px;background:none;color:var(--fg2);cursor:pointer;transition:background-color .15s var(--ease),color .15s var(--ease),border-color .15s var(--ease)}
-.icon:hover{color:var(--fg);border-color:var(--line2);background:var(--hover)}
+.lang button[aria-pressed=true]{background:var(--acc);color:var(--onacc)}
+.icon{display:grid;place-items:center;width:32px;height:32px;margin-left:4px;padding:0;border:1px solid var(--line);border-radius:4px;background:var(--ctl);color:var(--fg2);cursor:pointer;transition:background-color .15s var(--ease),color .15s var(--ease),border-color .15s var(--ease)}
+.icon:hover{color:var(--fg);background:var(--ctlh)}
 .icon svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .icon .moon{display:none}
 :root[data-theme=light] .icon .sun{display:none}
@@ -67,8 +78,8 @@ label.mrow{cursor:pointer}
 
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:760px){.grid{grid-template-columns:1fr}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
-.card .card{background:none;border-radius:8px;padding:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:24px}
+.card .card{background:var(--ctla);border-radius:6px;padding:20px}
 .card h2{margin:0;font-size:15px;line-height:24px;font-weight:600;letter-spacing:-.005em}
 .card .card h2{font-size:14px;font-weight:500}
 #swp{display:flex;flex-direction:column;gap:16px}
@@ -76,17 +87,19 @@ label.mrow{cursor:pointer}
 .field{margin-top:12px}
 label{display:block;margin-bottom:4px;font-size:12px;line-height:16px;color:var(--fg2)}
 .hint{margin-top:4px;font-size:12px;line-height:16px;color:var(--mut);text-wrap:pretty}
-input,select{width:100%;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--fg);font:14px var(--sans);transition:border-color .15s var(--ease)}
-input:hover,select:hover{border-color:var(--line2)}
-input:focus-visible,button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
-.pre{display:flex;align-items:center;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--field);transition:border-color .15s var(--ease)}
-.pre:hover{border-color:var(--line2)}
-.pre:focus-within{outline:2px solid var(--fg);outline-offset:2px}
+input,select{width:100%;height:34px;padding:0 12px;border:1px solid var(--line);border-bottom-color:var(--strong);border-radius:4px;background:var(--field);color:var(--fg);font:14px var(--sans);transition:background-color .15s var(--ease)}
+input:hover,select:hover{background:var(--ctlh)}
+input:focus,select:focus,textarea:focus{outline:0;background:var(--fieldf);border-bottom-color:var(--acc);box-shadow:inset 0 -1px 0 var(--acc)}
+button:focus-visible,input[type=checkbox]:focus-visible,input[type=range]:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.pre{display:flex;align-items:center;height:34px;border:1px solid var(--line);border-bottom-color:var(--strong);border-radius:4px;background:var(--field);transition:background-color .15s var(--ease)}
+.pre:hover{background:var(--ctlh)}
+.pre:focus-within{background:var(--fieldf);border-bottom-color:var(--acc);box-shadow:inset 0 -1px 0 var(--acc)}
+.pre input:focus{background:none;box-shadow:none}
 .pre span{padding-left:12px;font:12px var(--mono);color:var(--mut);white-space:nowrap}
 .pre input{border:0;background:none;padding:0 12px 0 0;font-family:var(--mono);font-size:13px;outline:0}
 
 /* the swap: who gives, which ID moves, who receives */
-.flow{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:8px}
+.flow{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:6px;background:var(--ctla)}
 .node{display:flex;align-items:center;gap:8px;min-width:0}
 .node.r{justify-content:flex-end}
 .who{display:flex;flex-direction:column;min-width:0}
@@ -96,13 +109,13 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--fg);outline-off
 .who small{font:12px/16px var(--mono);color:var(--mut)}
 .hd{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:32px}
 .dot{flex:none;width:8px;height:8px;border-radius:50%;background:none;box-shadow:inset 0 0 0 1px var(--line2);transition:background-color .3s var(--ease)}
-.dot.on{background:var(--fg);box-shadow:none}.dot.done{background:var(--pos);box-shadow:none}
+.dot.on{background:var(--acc);box-shadow:none}.dot.done{background:var(--pos);box-shadow:none}
 .link{position:relative;display:flex;align-items:center;justify-content:center;min-width:200px}
 .link::before{content:"";position:absolute;left:0;right:8px;top:50%;height:1px;background:var(--line2)}
 .link::after{content:"";position:absolute;right:0;top:50%;width:6px;height:6px;margin-top:-3px;border-top:1px solid var(--mut);border-right:1px solid var(--mut);transform:rotate(45deg)}
-.chip{position:relative;max-width:100%;padding:4px 12px;border:1px solid var(--line2);border-radius:6px;background:var(--card);font:12px/16px var(--mono);color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:border-color .3s var(--ease)}
+.chip{position:relative;max-width:100%;padding:4px 12px;border:1px solid var(--line2);border-radius:4px;background:var(--card);font:12px/16px var(--mono);color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:border-color .3s var(--ease)}
 .chip.done{border-color:var(--pos)}.chip i{font-style:normal;color:var(--mut)}
-.move{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:0 0 16px;padding:12px 16px;border:1px solid transparent;border-radius:8px;background:var(--raised);font:13px/20px var(--sans);color:var(--fg2)}
+.move{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:0 0 16px;padding:12px 16px;border:1px solid var(--line);border-radius:6px;background:var(--ctl);font:13px/20px var(--sans);color:var(--fg2)}
 .move code{font:500 15px/20px var(--mono);color:var(--fg)}
 .move code.auto{font:13px/20px var(--sans);color:var(--mut)}
 .move.done{border-color:var(--pos)}
@@ -110,21 +123,21 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--fg);outline-off
 
 .bar{display:flex;align-items:center;gap:12px}
 .bar p{margin:0 0 0 4px;font-size:12px;line-height:16px;color:var(--mut);text-wrap:pretty}
-.btn{white-space:nowrap;height:36px;padding:0 16px;border:1px solid var(--fg);border-radius:8px;background:var(--fg);color:var(--on);font:500 13px var(--sans);cursor:pointer;transition:background-color .15s var(--ease),border-color .15s var(--ease),color .15s var(--ease),opacity .15s var(--ease)}
-.btn:hover{opacity:.86}.btn:active{opacity:.72}
+.btn{white-space:nowrap;height:32px;padding:0 16px;border:1px solid transparent;border-radius:4px;background:var(--acc);color:var(--onacc);font:400 14px var(--sans);cursor:pointer;transition:background-color .1s var(--ease),border-color .1s var(--ease),color .1s var(--ease),opacity .1s var(--ease)}
+.btn:hover{background:var(--acch)}.btn:active{background:var(--acca);color:var(--onacc)}
 .btn:disabled{opacity:.4;cursor:default}
-.btn.sec{background:none;color:var(--fg);border-color:var(--line)}
-.btn.sec:hover{opacity:1;background:var(--hover);border-color:var(--line2)}
-.btn.sec:active{background:var(--raised)}
-.btn.sec:disabled{background:none;border-color:var(--line)}
-.btn.sm{height:32px;padding:0 12px}
-.btn.ghost{background:none;border-color:transparent;color:var(--fg2)}
-.btn.sec.on{opacity:1;background:var(--fg);color:var(--on);border-color:var(--fg)}
+.btn.sec{background:var(--ctl);color:var(--fg);border-color:var(--line)}
+.btn.sec:hover{background:var(--ctlh)}
+.btn.sec:active{background:var(--ctla);color:var(--fg2)}
+.btn.sec:disabled{background:var(--ctl);border-color:var(--line)}
+.btn.sm{height:28px;padding:0 12px;font-size:13px}
+.btn.ghost{background:none;border-color:transparent;color:var(--fg2)}.btn.ghost:active{background:var(--ctla)}
+.btn.sec.on{background:var(--acc);color:var(--onacc);border-color:transparent}
 .btn.ghost:hover{opacity:1;background:var(--hover);color:var(--fg)}
 
 .btns{display:flex;flex-wrap:wrap;gap:8px}
 #prog{margin:12px 0 0;font:12px/16px var(--mono);color:var(--fg2)}
-#guard{display:none;border-color:var(--line2);background:var(--raised)}
+#guard{display:none;border-color:var(--acc);background:var(--raised)}
 #guard .row{display:flex;gap:8px;margin-top:12px}
 #guard input{font-family:var(--mono);letter-spacing:.1em}
 
@@ -134,53 +147,63 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--fg);outline-off
 .sl{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin:0 0 16px}
 @media(max-width:760px){.sl{grid-template-columns:1fr}}
 .sl label{display:flex;justify-content:space-between;gap:8px}.sl b{font:12px/16px var(--mono);color:var(--fg);font-weight:400;font-variant-numeric:tabular-nums}
-/* sliders: a hairline track filled up to the thumb (--p is set from the value) */
+/* sliders: Fluent track filled with the accent up to the thumb (--p is set from the value) */
 input[type=range]{-webkit-appearance:none;appearance:none;height:20px;padding:0;border:0;background:none;cursor:pointer}
-input[type=range]::-webkit-slider-runnable-track{height:2px;border-radius:1px;background:linear-gradient(to right,var(--fg) var(--p,50%),var(--line2) var(--p,50%))}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-6px;border-radius:50%;background:var(--fg);box-shadow:0 0 0 3px var(--card);transition:transform .15s var(--ease)}
-input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.15)}
-/* checkboxes: a hairline box that fills with ink */
-input[type=checkbox]{-webkit-appearance:none;appearance:none;flex:none;display:inline-grid;place-content:center;width:16px;height:16px;margin:0;padding:0;border:1px solid var(--line2);border-radius:4px;background:none;cursor:pointer;transition:background-color .15s var(--ease),border-color .15s var(--ease)}
-input[type=checkbox]::before{content:"";width:8px;height:4px;margin-top:-2px;border-left:1.5px solid var(--on);border-bottom:1.5px solid var(--on);transform:rotate(-45deg);opacity:0}
-input[type=checkbox]:hover{border-color:var(--fg2)}
-input[type=checkbox]:checked{background:var(--fg);border-color:var(--fg)}
+input[type=range]:hover,input[type=range]:focus{background:none;box-shadow:none}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(to right,var(--acc) var(--p,50%),var(--strong) var(--p,50%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;box-sizing:border-box;width:20px;height:20px;margin-top:-8px;border:5px solid var(--thumb);border-radius:50%;background:var(--acc);box-shadow:0 0 0 1px var(--line2);transition:border-width .1s var(--ease)}
+input[type=range]:hover::-webkit-slider-thumb{border-width:4px}
+input[type=range]:active::-webkit-slider-thumb{border-width:6px}
+/* checkboxes: Fluent box that fills with the accent */
+input[type=checkbox]{-webkit-appearance:none;appearance:none;flex:none;display:inline-grid;place-content:center;width:18px;height:18px;margin:0;padding:0;border:1px solid var(--strong);border-radius:4px;background:var(--ctla);cursor:pointer;transition:background-color .1s var(--ease),border-color .1s var(--ease)}
+input[type=checkbox]:focus{background:var(--ctla);box-shadow:none}
+input[type=checkbox]::before{content:"";width:9px;height:4px;margin-top:-2px;border-left:1.5px solid var(--onacc);border-bottom:1.5px solid var(--onacc);transform:rotate(-45deg);opacity:0}
+input[type=checkbox]:hover{background:var(--ctlh)}
+input[type=checkbox]:checked{background:var(--acc);border-color:var(--acc)}
 input[type=checkbox]:checked::before{opacity:1}
 input[type=checkbox]:disabled{opacity:.4;cursor:default}
-/* the one switch: update check on start */
-.ver input[type=checkbox],.mrow input[type=checkbox]{place-content:center start;width:28px;height:16px;border-radius:8px;border-color:var(--line2);background:var(--raised)}
-.ver input[type=checkbox],.mrow input[type=checkbox]::before{width:10px;height:10px;margin:0 0 0 2px;border:0;border-radius:50%;background:var(--mut);opacity:1;transform:none;transition:transform .15s var(--ease),background-color .15s var(--ease)}
-.ver input[type=checkbox],.mrow input[type=checkbox]:checked{background:var(--fg);border-color:var(--fg)}
-.ver input[type=checkbox],.mrow input[type=checkbox]:checked::before{background:var(--on);transform:translateX(12px)}
+/* settings switches: Fluent toggle */
+.mrow input[type=checkbox]{place-content:center start;width:40px;height:20px;border-radius:10px;border-color:var(--strong);background:var(--ctla)}
+.mrow input[type=checkbox]::before{width:12px;height:12px;margin:0 0 0 3px;border:0;border-radius:50%;background:var(--fg2);opacity:1;transform:none;transition:transform .15s var(--ease),background-color .15s var(--ease)}
+.mrow input[type=checkbox]:checked{background:var(--acc);border-color:var(--acc)}
+.mrow input[type=checkbox]:checked::before{background:var(--onacc);transform:translateX(20px)}
 
 .log{flex:none;display:flex;flex-direction:column}
 .log h2{margin-bottom:12px}
 #log{height:288px;overflow:auto;font:12px/20px var(--mono);color:var(--fg2)}
 #log div{display:flex;gap:12px}#log time{flex:none;color:var(--mut)}
 #log .ok{color:var(--pos)}#log .bad{color:var(--neg)}
-#ctx{position:fixed;z-index:30;min-width:168px;padding:4px;background:var(--raised);border:1px solid var(--line2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#ctx{position:fixed;z-index:30;min-width:168px;padding:4px;background:var(--raised);border:1px solid var(--line2);border-radius:8px;box-shadow:var(--shadow)}
 #ctx[hidden]{display:none}
-#ctx button{display:block;width:100%;padding:6px 12px;border:0;border-radius:6px;background:none;color:var(--fg);font:13px/20px var(--sans,inherit);text-align:left;cursor:pointer}
+#ctx button{display:block;width:100%;padding:6px 12px;border:0;border-radius:4px;background:none;color:var(--fg);font:13px/20px var(--sans,inherit);text-align:left;cursor:pointer}
 #ctx button:hover:not(:disabled){background:var(--hover)}#ctx button:disabled{opacity:.4;cursor:default}
 #ctx hr{height:1px;margin:4px 0;border:0;background:var(--line)}
 #foot{display:none;position:fixed;left:0;right:0;bottom:0;z-index:5;flex-direction:column;justify-content:flex-end;height:32px;padding:6px 32px;box-sizing:border-box;background:var(--card);border-top:1px solid var(--line);font:12px/20px var(--mono);color:var(--fg2);cursor:pointer;white-space:nowrap;overflow:hidden}
 #foot.show{display:flex}#foot.open{height:133px;overflow-y:auto}#foot div{display:flex;gap:12px;flex:none}#foot time{flex:none;color:var(--mut)}#foot span{overflow:hidden;text-overflow:ellipsis}
 #foot .ok{color:var(--pos)}#foot .bad{color:var(--neg)}
-#helpDlg,#fastDlg{width:min(640px,calc(100% - 32px));max-height:calc(100% - 64px);padding:24px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg);box-shadow:var(--shadow);overflow:auto}
-#helpDlg[open],#fastDlg[open]{animation:pop .18s ease-out}
+#idDlg,#histDlg,#helpDlg,#fastDlg{width:min(640px,calc(100% - 32px));max-height:calc(100% - 64px);padding:24px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--fg);box-shadow:var(--shadow);overflow:auto}
+#idDlg[open],#histDlg[open],#helpDlg[open],#fastDlg[open]{animation:pop .18s ease-out}
 @keyframes pop{from{opacity:0;transform:translateY(4px)}}
-#helpDlg h2,#fastDlg h2{margin:0;font-size:15px;line-height:24px;font-weight:600}
-#helpDlg::backdrop,#fastDlg::backdrop{background:rgba(0,0,0,.55)}
+#idDlg h2,#histDlg h2,#helpDlg h2,#fastDlg h2{margin:0;font-size:15px;line-height:24px;font-weight:600}
+#idDlg::backdrop,#histDlg::backdrop,#helpDlg::backdrop,#fastDlg::backdrop{background:rgba(0,0,0,.55)}
+#idDlg{width:min(420px,calc(100% - 32px))}
+#idDlg input{width:100%;margin:16px 0;box-sizing:border-box}
+#histBody{margin-top:12px}
+#histBody .hr{display:grid;grid-template-columns:128px 88px minmax(0,1fr) minmax(0,1fr) auto;align-items:center;gap:12px;min-height:40px;border-bottom:1px solid var(--line);font-size:13px}
+#histBody .hr span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#histBody time,#histBody .k{color:var(--mut);font-variant-numeric:tabular-nums}
+body.drop::after{content:attr(data-drop);position:fixed;inset:12px;z-index:9;display:grid;place-items:center;border:2px dashed var(--acc);border-radius:8px;background:color-mix(in srgb,var(--bg) 85%,transparent);color:var(--fg);font-size:15px;pointer-events:none}
 #helpBody h3{margin:24px 0 4px;font-size:13px;line-height:20px;font-weight:600;color:var(--fg)}
 #helpBody p{margin:4px 0 0;font-size:13px;line-height:20px;color:var(--fg2);text-wrap:pretty}
 .ver{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 4px;font:12px/16px var(--sans);color:var(--mut)}
 .ver label{display:flex;align-items:center;gap:8px;margin:0;color:var(--fg2);cursor:pointer}
 #empty{color:var(--mut);font:13px/20px var(--sans)}
-textarea{width:100%;min-height:72px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--fg);font:13px/20px var(--mono);resize:vertical;transition:border-color .15s var(--ease)}
-textarea:hover{border-color:var(--line2)}textarea:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
-#mList{max-height:312px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+textarea{width:100%;min-height:72px;padding:8px 12px;border:1px solid var(--line);border-bottom-color:var(--strong);border-radius:4px;background:var(--field);color:var(--fg);font:13px/20px var(--mono);resize:vertical;transition:border-color .15s var(--ease)}
+textarea:hover{background:var(--ctlh)}
+#mList{max-height:312px;overflow:auto;border:1px solid var(--line);border-radius:6px}
 .sub{margin-top:24px;padding-top:24px;border-top:1px solid var(--line)}
 .sub h3{margin:0;font-size:14px;line-height:20px;font-weight:500}
-.ar{display:grid;grid-template-columns:20px minmax(0,1.3fr) minmax(0,1.4fr) minmax(0,1fr) 200px;align-items:center;gap:12px;min-height:44px;padding:4px 12px;border-bottom:1px solid var(--line);font-size:13px}
+.ar{display:grid;grid-template-columns:20px minmax(0,1.3fr) minmax(0,1.4fr) minmax(0,1fr) 392px;align-items:center;gap:12px;min-height:44px;padding:4px 12px;border-bottom:1px solid var(--line);font-size:13px}
 .ar:last-child{border-bottom:0}
 .ar.h .s{padding:0;border:0;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;white-space:nowrap}.ar.h .s:hover{color:var(--fg)}
 .ar.h{position:sticky;top:0;z-index:1;min-height:32px;background:var(--card);font-size:12px;color:var(--mut)}
@@ -188,20 +211,20 @@ textarea:hover{border-color:var(--line2)}textarea:focus-visible{outline:2px soli
 .ar .m{font:12px/16px var(--mono);color:var(--fg2)}
 .ar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:16px;color:var(--mut)}
 .ar small.e{color:var(--neg)}
-.ar.stale{background:var(--hover);box-shadow:inset 2px 0 var(--fg2)}
+.ar.stale{background:var(--hover);box-shadow:inset 3px 0 var(--acc)}
 .ar.none{display:block;color:var(--mut)}
 .ar:not(.h):not(.none):not(.d){cursor:pointer;transition:background-color .15s var(--ease)}.ar:not(.h):not(.none):not(.d):hover{background:var(--hover)}
 .ar:has(+ .ar.d){border-bottom-color:transparent}
 .ar .btns{flex-wrap:nowrap;justify-content:flex-end}
-.ar .btn.sm{height:28px;padding:0 8px;border-radius:6px;font-size:12px}
+.ar .btn.sm{height:26px;padding:0 8px;border-radius:4px;font-size:12px}
 .ar.d{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:0;padding:4px 12px 12px 44px;background:var(--hover);font:12px/20px var(--mono);color:var(--fg2);user-select:text}
 .ar.d .x{flex:1 1 160px;min-width:0;overflow-wrap:anywhere}
 @media(max-width:760px){.ar{grid-template-columns:20px minmax(0,1fr) auto}.ar .m,.ar.h>:nth-child(3),.ar.h>:nth-child(4){display:none}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style></head><body>
 <header><div class="in">
-  <h1><img class="logo" alt="" src="data:image/png;base64,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"><span data-i="title"></span></h1>
-</div></header>
+  <h1><img class="logo" alt="" src="data:image/png;base64,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"><span data-i="title"></span></h1>
+</div><nav class="tabs"><button data-go="swp">Swapper</button><button data-go="mgr">Account manager</button><button data-go="fnd">ID finder</button></nav></header>
 <div class="app">
 
 <section class="card" id="swp">
@@ -261,7 +284,7 @@ textarea:hover{border-color:var(--line2)}textarea:focus-visible{outline:2px soli
   </div>
 </section>
 
-<section class="card">
+<section class="card" id="fnd">
   <div class="hd"><h2 data-i="huntTitle"></h2>
     <div class="btns"><button class="btn sec sm" id="openIds" data-i="huntIds"></button><button class="btn sec sm" id="dir" data-i="huntOpen"></button></div></div>
   <p class="cap" data-i="huntCap" style="margin:4px 0 12px"></p>
@@ -274,7 +297,7 @@ textarea:hover{border-color:var(--line2)}textarea:focus-visible{outline:2px soli
     <div><label for="rSwap"><span data-i="sSwap"></span><b id="vSwap"></b></label><input type="range" id="rSwap" min="0" max="20" step="1" value="0"></div>
   </div>
   <p class="hint" data-i="sHint" style="margin:-8px 0 16px"></p>
-  <div class="bar"><button class="btn" id="hunt"></button><button class="btn sec sm" id="openFound" data-i="huntFound"></button><button class="btn sec sm" id="openClaimed" data-i="huntClaimed"></button><button class="btn sec sm" id="huntReset" data-i="huntReset"></button><p data-i="huntHint"></p></div>
+  <div class="bar"><button class="btn" id="hunt"></button><button class="btn sec sm" id="openFound" data-i="huntFound"></button><button class="btn sec sm" id="openClaimed" data-i="huntClaimed"></button><button class="btn sec sm" id="histBtn" data-i="histTitle"></button><button class="btn sec sm" id="huntReset" data-i="huntReset"></button><p data-i="huntHint"></p></div>
   <p id="prog"></p>
 </section>
 
@@ -290,6 +313,17 @@ textarea:hover{border-color:var(--line2)}textarea:focus-visible{outline:2px soli
 </section>
 <div class="ver"><span id="ver"></span></div>
 </div>
+<dialog id="idDlg" aria-labelledby="idT">
+  <form method="dialog">
+  <div class="hd"><h2 id="idT"></h2></div>
+  <input id="idIn" maxlength="64" spellcheck="false" autocomplete="off" placeholder="/id/">
+  <div class="btns" style="justify-content:flex-end"><button class="btn sec" type="button" id="idNo" data-i="cancel"></button><button class="btn" value="ok" id="idOk" data-i="mgrSetIdGo"></button></div>
+  </form>
+</dialog>
+<dialog id="histDlg" aria-labelledby="histT">
+  <div class="hd"><h2 id="histT" data-i="histTitle"></h2><button class="btn sec sm" id="histX" data-i="close"></button></div>
+  <div id="histBody"></div>
+</dialog>
 <dialog id="fastDlg" aria-labelledby="fastT">
   <div class="hd"><h2 id="fastT" data-i="fastLogTitle"></h2><button class="btn sec sm" id="fastX" data-i="close"></button></div>
   <pre id="fastBody" style="margin:16px 0 0;font:12px/18px var(--mono);color:var(--fg2);white-space:pre-wrap;word-break:break-word;user-select:text"></pre>
@@ -361,7 +395,7 @@ ru:{title:'Manager',menuTitle:'Настройки',menuTray:'Сворачива�
   mgrExported:'Конфиг сохранён: {file}',passWeak:'Пароль конфига: минимум 5 символов, с цифрой и заглавной буквой',huntSkipId:'Пропущено аккаунтов, у которых уже есть ID: {n} (нажмите «Проверить выбранные» в менеджере, чтобы обновить данные)',huntLoginLimit:'Steam ограничил частоту входов или запросов: аккаунты пока не берутся, при следующей находке попробую снова',fastBtn:'Быстрый обмен',ctxCut:'Вырезать',ctxCopy:'Копировать',ctxPaste:'Вставить',ctxDelete:'Удалить',ctxAll:'Выделить всё',proxyTitle:'Прокси',proxyUse:'Использовать',proxyWarp:'WARP',proxyLocked:'Включён прокси: обмен и менеджер аккаунтов недоступны',proxyCheck:'Проверить',proxyHint:'Для Cloudflare WARP: выполните warp-cli mode proxy и укажите socks5://127.0.0.1:40000 (кнопка WARP подставляет адрес). Прокси работает только для поиска ID; пока он включён, обмен и менеджер аккаунтов недоступны. После перезапуска прокси выключен, адрес остаётся.',proxyOn:'Прокси включён: {url}',proxyOff:'Прокси выключен',proxyBad:'Неверный адрес прокси: нужен вид socks5://127.0.0.1:40000 или http://хост:порт',proxyBusy:'Прокси нельзя менять, пока идёт работа',proxyVia:'через прокси',proxyDirect:'напрямую',proxyOk:'Проверка ({via}): IP {ip}, страна {loc}, WARP {warp}',proxyFail:'Прокси не отвечает',proxyDown:'Прокси не отвечает: поиск идёт без него, прокси проверяется раз в 5 минут',proxyBack:'Прокси снова отвечает: поиск идёт через него',takeBtn:'Взять с аккаунта 2',takeHint:'В самом конце, после удачного обмена, аккаунт 1 получит ID, который освободил аккаунт 2',taken:'Аккаунт 1 забрал освободившийся ID «{id}»',takeFail:'Не удалось поставить ID «{id}» на аккаунт 1: {msg}',takeNone:'У аккаунта 2 не было ID, забирать нечего',fastLogBtn:'Лог',fastLogTitle:'Лог быстрого обмена',fastWarn:'Быстрый обмен: ID не должен был меняться ни на одном из двух аккаунтов за последний час, иначе Steam может отклонить смену. Продолжить?',mgrStale:'Изменён: проверьте заново',fastLog:'{m}',fastKept:'Быстрый обмен: Steam не освободил ID аккаунта 1 («{target}» на месте), ничего не перенесено. {msg}',themeLight:'Светлая тема',themeDark:'Тёмная тема',upd:'Обновление',gh:'GitHub',help:'Помощь',close:'Закрыть',updAuto:'Проверять обновления при запуске',updNew:'Доступна новая версия {v}: нажмите «Обновление», чтобы скачать',updLatest:'У вас последняя версия ({v})',updNone:'Релизов на GitHub пока нет',updFail:'Не удалось проверить обновления',verText:'Версия {v}',noLink:'Ссылка на GitHub ещё не задана в программе',noAccounts:'Нет аккаунтов для экспорта',
   badConfig:'Это не конфиг IDManager for Steam: текст должен начинаться с VSA1.',badPass:'Неверный пароль или файл повреждён',
   mgrAddLabel:'Добавить аккаунты',mgrAddHint:'По одному в строке: логин:пароль или логин:пароль:shared_secret (тогда коды Steam Guard вводятся сами). Известный логин получит новый пароль',mgrAdd:'Добавить',
-  mgrEmpty:'Аккаунтов пока нет, добавьте их ниже',mgrSteamId:'SteamID64',mgrId:'Свой ID',mgrClear:'Очистить ID',mgrRemove:'Удалить',
+  mgrEmpty:'Аккаунтов пока нет, добавьте их ниже',mgrSteamId:'SteamID64',mgrId:'Свой ID',mgrClear:'Очистить ID',mgrLink:'Профиль',mgrSetId:'Изменить ID',mgrSetIdT:'ID для аккаунта {login}',mgrSetIdGo:'Поставить',cancel:'Отмена',mgrSetIdConfirm:'Сменить ID аккаунта {login} с /id/{old} на /id/{id}? Старый ID освободится, и его сможет занять кто угодно.',idSet:'Аккаунт {login}: поставлен ID «{id}»',badId:'«{id}» не подходит: 3–32 символа, латиница, цифры, _ и -',histTitle:'История',histEmpty:'Пока пусто: здесь появятся свапы и занятые ID',histClaimed:'занят',histSwap:'свап',histSet:'вручную',histCleared:'удалён',idsDrop:'Отпустите файл, чтобы заменить список ID',idsDropConfirm:'Заменить список ID (ids.txt) содержимым файла «{name}»? Место остановленного поиска сбросится.',idsLoaded:'Список ID заменён: {n} к проверке',mgrRemove:'Удалить',
   mgrClearConfirm:'Полностью удалить ID /id/{id} у аккаунта {login}? Профиль останется только по номеру, а ID сможет занять кто угодно: вернуть его может не получиться.',
   mgrRemoveConfirm:'Удалить аккаунт {login} из accounts.txt? Его пароль будет стёрт из файла.',
   mgrSel:'Для поиска выбрано: {n} из {m}',mgrSecret:'shared_secret задан',mgrManual:'нужен код Steam Guard вручную',
@@ -419,7 +453,7 @@ en:{title:'Manager',menuTitle:'Settings',menuTray:'Minimize to tray on close',me
   mgrExported:'Config saved: {file}',passWeak:'Config password: at least 5 characters, with a digit and a capital letter',huntSkipId:'Skipped accounts that already have an ID: {n} (press Check selected in the manager to refresh what is known)',huntLoginLimit:'Steam limited sign-ins or requests: accounts are not taken for now, I will try again on the next find',fastBtn:'Fast swap',ctxCut:'Cut',ctxCopy:'Copy',ctxPaste:'Paste',ctxDelete:'Delete',ctxAll:'Select all',proxyTitle:'Proxy',proxyUse:'Use',proxyWarp:'WARP',proxyLocked:'Proxy is on: the swap and the account manager are unavailable',proxyCheck:'Check',proxyHint:'For Cloudflare WARP: run warp-cli mode proxy and enter socks5://127.0.0.1:40000 (the WARP button fills in the address). The proxy works for the ID search only; while it is on, the swap and the account manager are unavailable. After a restart the proxy is off, the address stays.',proxyOn:'Proxy on: {url}',proxyOff:'Proxy off',proxyBad:'Bad proxy address: use socks5://127.0.0.1:40000 or http://host:port',proxyBusy:'The proxy cannot be changed while something is running',proxyVia:'via proxy',proxyDirect:'direct',proxyOk:'Check ({via}): IP {ip}, country {loc}, WARP {warp}',proxyFail:'The proxy does not answer',proxyDown:'The proxy does not answer: the search goes on without it, the proxy is checked every 5 minutes',proxyBack:'The proxy answers again: the search goes through it',takeBtn:'Take from account 2',takeHint:'At the very end, after a successful swap, account 1 takes the ID that account 2 gave up',taken:'Account 1 took the released ID “{id}”',takeFail:'Could not set the ID “{id}” on account 1: {msg}',takeNone:'Account 2 had no ID, nothing to take',fastLogBtn:'Log',fastLogTitle:'Fast swap log',fastWarn:'Fast swap: the ID must not have been changed on either of the two accounts in the last hour, or Steam may refuse the change. Continue?',mgrStale:'Changed: check again',fastLog:'{m}',fastKept:'Fast swap: Steam did not release the ID of account 1 (“{target}” is still there), nothing was moved. {msg}',themeLight:'Light theme',themeDark:'Dark theme',upd:'Update',gh:'GitHub',help:'Help',close:'Close',updAuto:'Check for updates on start',updNew:'New version {v} is available: press Update to download it',updLatest:'You have the latest version ({v})',updNone:'No releases on GitHub yet',updFail:'Could not check for updates',verText:'Version {v}',noLink:'The GitHub link is not set in the program yet',noAccounts:'No accounts to export',
   badConfig:'This is not an IDManager for Steam config: the text must start with VSA1.',badPass:'Wrong password or the file is damaged',
   mgrAddLabel:'Add accounts',mgrAddHint:'One per line: login:password or login:password:shared_secret (then Steam Guard codes are entered automatically). A known login gets the new password',mgrAdd:'Add',
-  mgrEmpty:'No accounts yet, add them below',mgrSteamId:'SteamID64',mgrId:'Custom ID',mgrClear:'Clear ID',mgrRemove:'Delete',
+  mgrEmpty:'No accounts yet, add them below',mgrSteamId:'SteamID64',mgrId:'Custom ID',mgrClear:'Clear ID',mgrLink:'Profile',mgrSetId:'Change ID',mgrSetIdT:'ID for account {login}',mgrSetIdGo:'Set',cancel:'Cancel',mgrSetIdConfirm:'Change the ID of account {login} from /id/{old} to /id/{id}? The old ID will be released and anyone could take it.',idSet:'Account {login}: the ID “{id}” is set',badId:'“{id}” does not fit: 3–32 characters, Latin letters, digits, _ and -',histTitle:'History',histEmpty:'Nothing yet: swaps and claimed IDs will show up here',histClaimed:'claimed',histSwap:'swap',histSet:'by hand',histCleared:'removed',idsDrop:'Drop the file to replace the ID list',idsDropConfirm:'Replace the ID list (ids.txt) with the contents of “{name}”? The place of a stopped search is reset.',idsLoaded:'ID list replaced: {n} to check',mgrRemove:'Delete',
   mgrClearConfirm:'Remove the ID /id/{id} of account {login} completely? The profile will be reachable only by its number and anyone could take the ID: getting it back may not be possible.',
   mgrRemoveConfirm:'Delete account {login} from accounts.txt? Its password will be erased from the file.',
   mgrSel:'Selected for the search: {n} of {m}',mgrSecret:'shared_secret set',mgrManual:'needs a Steam Guard code by hand',
@@ -561,7 +595,7 @@ const dot=(n,s)=>{$('d'+n).className='dot '+(s||'')};
 
 api.onLog((key,p)=>{
   if(key==='accChecked')p={...p,id:p.id||'—'};
-  push(key,p,['done','ready','taken','proxyOk','proxyOn','proxyBack','huntResetDone','found','claimed','huntDone','accChecked','refreshDone','idCleared','mgrExported'].includes(key)?'ok':['proxyBad','proxyBusy','proxyDown','proxyLocked','takeFail','passWeak','noAccounts','huntLoginLimit','noLink','badConfig','badPass','retry','rollbackFail','noProfile','rateLimit','waitRate','firstFail','huntWait','huntUnknown','badIds','badAccounts','accHasId','accFail','noSpare','claimFail','accCooldown','fileFail','accCheckFail','accRateLimit','clearChanged','clearKept','accMissing'].includes(key)?'bad':'');
+  push(key,p,['done','ready','taken','proxyOk','proxyOn','proxyBack','huntResetDone','found','claimed','huntDone','accChecked','refreshDone','idCleared','idSet','idsLoaded','mgrExported'].includes(key)?'ok':['proxyBad','proxyBusy','proxyDown','proxyLocked','takeFail','passWeak','noAccounts','huntLoginLimit','noLink','badConfig','badPass','retry','rollbackFail','noProfile','rateLimit','waitRate','firstFail','huntWait','huntUnknown','badIds','badAccounts','accHasId','accFail','noSpare','claimFail','accCooldown','fileFail','accCheckFail','accRateLimit','clearChanged','clearKept','accMissing'].includes(key)?'bad':'');
   if(key==='huntStart')live({checked:0,total:p.t,found:0,claimed:0}); // the line that then keeps counting
   if(key==='session'&&(p.n===1||p.n===2))dot(p.n,'on'); // the search names accounts by login
   if(key==='ready'){moved=p.target;flow()}
@@ -679,6 +713,37 @@ async function checkUpd(manual){
 $('upd').onclick=()=>checkUpd(true);
 $('fastLogBtn').onclick=async()=>{$('fastBody').textContent=await api.fastLog();$('fastDlg').showModal()};
 $('fastX').onclick=()=>$('fastDlg').close();
+const HK={claimed:'histClaimed',swap:'histSwap',set:'histSet',cleared:'histCleared'};
+$('histBtn').onclick=async()=>{
+  const r=await api.history();if(r.error)return accErr(r);const div=(c,x)=>Object.assign(document.createElement('div'),{className:c,textContent:x??''});
+  const box=$('histBody');box.replaceChildren();
+  if(!r.result.length)box.append(div('k',t('histEmpty')));
+  for(const h of r.result){
+    const row=div('hr'),tm=document.createElement('time');
+    tm.textContent=new Date(h.at).toLocaleString([], {dateStyle:'short',timeStyle:'short'});
+    const go=Object.assign(document.createElement('button'),{className:'btn sec sm',textContent:t('mgrLink'),disabled:!h.id||h.kind==='cleared'});
+    go.onclick=async()=>{const x=await api.openId(h.id);if(x&&x.error)accErr(x)};
+    const sp=v=>Object.assign(document.createElement('span'),{textContent:v,title:v});
+    row.append(tm,div('k',t(HK[h.kind]||h.kind)),sp(h.id?'/id/'+h.id:'—'),sp(h.login||''),go);box.append(row);
+  }
+  $('histDlg').showModal();
+};
+$('idNo').onclick=()=>$('idDlg').close('');
+$('histX').onclick=()=>$('histDlg').close();
+$('histDlg').onclick=e=>{if(e.target===$('histDlg'))$('histDlg').close()};
+let dragN=0; // dragenter/dragleave also fire for every child the file passes over
+const hasFile=e=>[...e.dataTransfer.types].includes('Files');
+addEventListener('dragenter',e=>{if(!hasFile(e))return;dragN++;document.body.dataset.drop=t('idsDrop');document.body.classList.add('drop')});
+addEventListener('dragleave',()=>{if(--dragN<=0){dragN=0;document.body.classList.remove('drop')}});
+addEventListener('dragover',e=>{if(hasFile(e))e.preventDefault()});
+addEventListener('drop',async e=>{
+  e.preventDefault();dragN=0;document.body.classList.remove('drop');
+  const f=e.dataTransfer.files[0];
+  if(!f||hunting||!confirm(t('idsDropConfirm',{name:f.name})))return;
+  const r=await api.setIds(await f.text());
+  if(r.error)return accErr(r);
+  idCount=r.result;push('idsLoaded',{n:r.result.n});render();showEst();
+});
 $('fastDlg').onclick=e=>{if(e.target===$('fastDlg'))$('fastDlg').close()};
 // the mascot opens the settings panel; a click outside or Esc closes it
 const mas=$('mascot');
@@ -706,6 +771,10 @@ $('helpDlg').onclick=e=>{if(e.target===$('helpDlg'))$('helpDlg').close()}; // a 
 $('updAuto').checked=(()=>{try{return localStorage.getItem('updAuto')!=='0'}catch{return true}})();
 $('updAuto').onchange=e=>{try{localStorage.setItem('updAuto',e.target.checked?'1':'0')}catch{}};
 api.appInfo().then(i=>{appVer=i.version;render();if($('updAuto').checked)checkUpd(false)});
+const tabs=[...document.querySelectorAll('.tabs button')];
+tabs.forEach(b=>b.onclick=()=>$(b.dataset.go).scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'}));
+const markTab=()=>{let cur=tabs[0];for(const b of tabs)if($(b.dataset.go).getBoundingClientRect().top<=110)cur=b;if(innerHeight+scrollY>=document.documentElement.scrollHeight-2)cur=tabs.at(-1);tabs.forEach(b=>b.classList.toggle('on',b===cur))};
+addEventListener('scroll',markTab,{passive:true});markTab();
 $('gh').onclick=async()=>{const r=await api.openLink('github');if(r&&r.error)accErr(r)};
 $('openFound').onclick=()=>openF('found');
 $('openClaimed').onclick=()=>openF('claimed');
@@ -713,7 +782,7 @@ $('openClaimed').onclick=()=>openF('claimed');
 let idCount=null; // {n, bad} after "Count IDs"
 const dur=s=>{s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+' '+t('unitH')+' '+m+' '+t('unitM'):m?m+' '+t('unitM')+' '+s%60+' '+t('unit'):s+' '+t('unit')};
 function showEst(){
-  const s=accs.filter(a=>a.use).length,n=accs.filter(a=>a.use&&!a.id).length; // an account that already has an ID is not used by the search
+  const s=accs.filter(a=>a.use&&!a.stale).length,n=accs.filter(a=>a.use&&!a.stale&&!a.id).length; // an account that already has an ID is not used by the search
   $('hSel').textContent=accs.length?t(n<s?'hSelSkip':'hSel',{n:n<s?n:s,s,m:accs.length}):'';
   const c=$('hCount'),tm=$('hTime');
   c.textContent=idCount?(idCount.n?t('hCount',{n:idCount.n}):t('hNone'))+(idCount.bad?', '+t('hBad',{n:idCount.bad}):''):'';
@@ -767,7 +836,11 @@ function renderAcc(){
       clr.onclick=()=>clearOne(a);
       const del=Object.assign(document.createElement('button'),{className:'btn sec sm',textContent:t('mgrRemove'),disabled:busy});
       del.onclick=()=>removeOne(a);
-      const act=div('btns');act.append(clr,del);
+      const link=Object.assign(document.createElement('button'),{className:'btn sec sm',textContent:t('mgrLink'),disabled:!a.id&&!a.steamId});
+      link.onclick=async()=>{const r=await api.openProfile(a.login);if(r&&r.error)accErr(r)};
+      const set=Object.assign(document.createElement('button'),{className:'btn sec sm',textContent:t('mgrSetId'),disabled:busy});
+      set.onclick=()=>setOne(a);
+      const act=div('btns');act.append(link,set,clr,del);
       r.append(cb,who,div('t m',a.steamId||'—'),div('t m',a.id?'/id/'+a.id:'—'),act);
       box.append(r);
       const s=shown.get(a.login);
@@ -780,7 +853,7 @@ function renderAcc(){
     }
   }
   box.scrollTop=keep;
-  $('mSel').textContent=accs.length?t('mgrSel',{n:accs.filter(a=>a.use).length,m:accs.length}):'';
+  $('mSel').textContent=accs.length?t('mgrSel',{n:accs.filter(a=>a.use&&!a.stale).length,m:accs.length}):'';
   ['mAll','mNone','mNoId','mAddBtn','mAddFile'].forEach(id=>$(id).disabled=busy);
   syncCfg();showEst();
   $('mRefresh').disabled=refreshing?false:busy||!accs.some(a=>a.use||a.stale);
@@ -813,6 +886,21 @@ async function clearOne(a){
   lock(false);
   if(r&&r.error)fail(r);
   render();loadAccs();
+}
+// set the custom ID of one account by hand; replacing an ID it has releases the old one, so that is confirmed
+function setOne(a){
+  $('idT').textContent=t('mgrSetIdT',{login:a.login});$('idIn').value=a.id;
+  $('idDlg').onclose=async()=>{
+    const id=$('idIn').value.trim().replace(/^.*\/id\//,'').replace(/\//g,'');
+    if($('idDlg').returnValue!=='ok'||!id||id===a.id)return;
+    if(a.id&&!confirm(t('mgrSetIdConfirm',{login:a.login,old:a.id,id})))return;
+    reset();lock(true);render();
+    const r=await api.accSetId({login:a.login,id});
+    lock(false);
+    if(r&&r.error)fail(r);
+    render();loadAccs();
+  };
+  $('idDlg').returnValue='';$('idDlg').showModal();$('idIn').select();
 }
 async function removeOne(a){
   if(!confirm(t('mgrRemoveConfirm',{login:a.login})))return;

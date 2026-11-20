@@ -505,11 +505,11 @@ const cfg = { a1: { login: 'a', password: 'b' }, a2: { login: 'c', password: 'd'
   assert.deepStrictEqual(acc.selected(dirM), ['m1', 'm3']);
   acc.setUse(dirM, null, true);
   assert.strictEqual(acc.selected(dirM).length, 3);
-  acc.patch(dirM, 'm2', { use: false, stale: true }); // marked as changed: cannot be ticked by anything, only the check takes it
-  acc.setUse(dirM, null, true); acc.setUse(dirM, ['m2'], true);
+  acc.patch(dirM, 'm2', { use: false, stale: true }); // marked as changed: ticked for the check, nothing can untick it, the search skips it
+  acc.setUse(dirM, null, false); acc.setUse(dirM, ['m2'], false); acc.setUse(dirM, ['m1', 'm3'], true);
   assert.deepStrictEqual(acc.selected(dirM), ['m1', 'm3']);
   assert.deepStrictEqual(acc.toCheck(dirM), ['m1', 'm3', 'm2'].sort((a, b) => a.localeCompare(b)));
-  assert.strictEqual(acc.list(dirM).find((a) => a.login === 'm2').use, false);
+  assert.strictEqual(acc.list(dirM).find((a) => a.login === 'm2').use, true);
   acc.patch(dirM, 'm2', { stale: false });
   acc.setUse(dirM, null, true);
 
@@ -547,6 +547,15 @@ const cfg = { a1: { login: 'a', password: 'b' }, a2: { login: 'c', password: 'd'
   owned.m2 = 'Stubborn'; deaf.add('m2');
   await assert.rejects(acc.clearId(dirM, { login: 'm2', id: 'Stubborn' }, { log: hio.log, askCode: async () => '0' }, L), (e) => /setting account details/.test(e.message) && !/</.test(e.message));
   deaf.clear(); owned.m2 = ''; posts.length = 0;
+  // setting an ID by hand: a bad ID is refused before any login, a good one is set and stored
+  await assert.rejects(acc.setOwnId(dirM, { login: 'm1', id: 'a b' }, { log: hio.log, askCode: async () => '0' }, L), (e) => e.key === 'badId');
+  assert.deepStrictEqual(posts, []);
+  hlogs.length = 0;
+  assert.strictEqual(await acc.setOwnId(dirM, { login: 'm1', id: 'NewOne' }, { log: hio.log, askCode: async () => '0' }, L), 'NewOne');
+  assert.deepStrictEqual(posts.splice(0), ['NewOne']);
+  assert.strictEqual(acc.list(dirM)[0].id, 'NewOne');
+  assert.ok(hlogs.some(([k, p]) => k === 'idSet' && p.id === 'NewOne'));
+  owned.m1 = ''; acc.patch(dirM, 'm1', { id: '' });
 
   // only the ticked accounts are checked
   logins = 0;
